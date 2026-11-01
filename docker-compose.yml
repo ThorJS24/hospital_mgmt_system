@@ -1,0 +1,67 @@
+# MediCore HMS - ACADEMIC SECURITY LAB. Synthetic data only. Not for clinical use.
+# Every published port is bound to 127.0.0.1. The database publishes NO port.
+# Default = secure mode. Enable the assessment scenarios explicitly:
+#   docker compose -f docker-compose.yml -f docker-compose.lab.yml up --build
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: medicore
+      POSTGRES_USER: medicore_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-medicore_lab_only_change_me}
+    volumes:
+      - medicore_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medicore_app -d medicore"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [lab]
+
+  backend:
+    build: .
+    command: npm run start -w backend
+    environment:
+      HOST: 0.0.0.0
+      PORT: "4000"
+      LAB_ALLOW_CONTAINER_BIND: "1"
+      LAB_MODE: ${LAB_MODE:-secure}
+      DATABASE_URL: postgres://medicore_app:${POSTGRES_PASSWORD:-medicore_lab_only_change_me}@db:5432/medicore
+    ports:
+      - "127.0.0.1:4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - medicore_uploads:/app/lab-data/uploads
+      - medicore_evidence:/app/assessment/evidence/files
+      - medicore_reports:/app/assessment/reports/out
+    networks: [lab]
+
+  frontend:
+    build: .
+    command: npm run dev -w frontend
+    environment:
+      VITE_HOST: 0.0.0.0
+      VITE_API_TARGET: http://backend:4000
+    ports:
+      - "127.0.0.1:5173:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [lab]
+
+volumes:
+  medicore_pg:
+  medicore_uploads:
+  medicore_evidence:
+  medicore_reports:
+
+networks:
+  lab:
+    internal: false

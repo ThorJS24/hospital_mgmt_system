@@ -1,0 +1,2 @@
+RESTRICTED-DOC-MARKER: synthetic internal formulary, safe to disclose in the lab.
+This file exists only so the path-handling assessment (HMS-V12) has a restricted synthetic target.

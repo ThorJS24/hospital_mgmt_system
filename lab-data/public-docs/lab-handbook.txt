@@ -1,0 +1,3 @@
+MediCore HMS - Laboratory handbook (SYNTHETIC)
+This document is fictional sample content for the academic security lab.
+Sample collection windows: fasting samples before 10:00.

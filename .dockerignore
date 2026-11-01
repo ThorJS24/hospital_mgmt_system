@@ -1,0 +1,10 @@
+node_modules
+**/node_modules
+.pglite*
+backend/.pglite*
+frontend/dist
+assessment/evidence/files
+assessment/reports/out
+lab-data/uploads
+.git
+.env

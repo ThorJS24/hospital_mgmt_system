@@ -1,0 +1,33 @@
+{
+  "name": "medicore-hms",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MediCore HMS - intentionally vulnerable hospital management system (academic security lab, synthetic data only)",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "db:migrate": "npm run migrate -w backend",
+    "db:seed": "npm run seed -w backend",
+    "db:reset": "npm run reset -w backend --",
+    "report": "npm run report -w backend",
+    "typecheck": "npm run typecheck -w backend && npm run typecheck -w frontend",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "start:secure": "node scripts/run-backend.mjs secure",
+    "start:lab": "node scripts/run-backend.mjs lab",
+    "lint": "eslint .",
+    "docker:lab": "docker compose -f docker-compose.yml -f docker-compose.lab.yml up --build",
+    "docker:secure": "docker compose up --build",
+    "docker:reset": "docker compose run --rm backend npm run reset -w backend"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.4",
+    "eslint-plugin-react-hooks": "^6.1.1",
+    "typescript-eslint": "^8.72.1"
+  }
+}

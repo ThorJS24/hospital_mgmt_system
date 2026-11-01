@@ -1,0 +1,257 @@
+{
+  "test_cases": [
+    {
+      "id": "HMS-AC-001",
+      "name": "Password reset token strength",
+      "objective": "Determine whether reset tokens are unpredictable and attempt-limited.",
+      "preconditions": "Lab running; synthetic account exists.",
+      "test_account": "nurse.okafor",
+      "target_component": "POST /api/auth/password-reset/confirm",
+      "expected_result": "Tokens are random, expire, and are invalidated after 5 wrong attempts (HTTP 429/400).",
+      "finding_id": "HMS-V06",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-AC-002",
+      "name": "Session identifier rotation on login",
+      "objective": "Verify that the session identifier changes at authentication.",
+      "preconditions": "Anonymous session obtained from GET /api/auth/session.",
+      "test_account": "receptionist.lindqvist",
+      "target_component": "POST /api/auth/login",
+      "expected_result": "sid cookie differs before and after login; old sid is invalid.",
+      "finding_id": "HMS-V07",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-AC-003",
+      "name": "Function-level authorization on audit data",
+      "objective": "Verify only audit.read holders can read audit events.",
+      "preconditions": "Logged in as non-admin.",
+      "test_account": "receptionist.lindqvist",
+      "target_component": "/api/admin/audit and /api/lab/admin/audit-export",
+      "expected_result": "403 for non-admin roles on both routes.",
+      "finding_id": "HMS-V04",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-AC-004",
+      "name": "Object-level authorization on patient summary",
+      "objective": "Verify a doctor cannot read patients outside their care team.",
+      "preconditions": "Patient not assigned to the doctor exists.",
+      "test_account": "doctor.mehta",
+      "target_component": "/api/patients/:id and /api/lab/patients/:id/summary",
+      "expected_result": "404/403 for unassigned patients on both routes.",
+      "finding_id": "HMS-V03",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-AC-005",
+      "name": "Object-level authorization on assigned patients (control)",
+      "objective": "Confirm assigned patients remain readable and unassigned patients denied on the secure route.",
+      "preconditions": "None.",
+      "test_account": "doctor.mehta",
+      "target_component": "GET /api/patients/:id",
+      "expected_result": "Assigned: 200. Unassigned: 404.",
+      "finding_id": null,
+      "kind": "security-control"
+    },
+    {
+      "id": "HMS-AC-006",
+      "name": "Role-based authorization (control)",
+      "objective": "Confirm role permissions are enforced on admin routes.",
+      "preconditions": "None.",
+      "test_account": "pharmacist.rossi",
+      "target_component": "GET /api/admin/users",
+      "expected_result": "403.",
+      "finding_id": null,
+      "kind": "security-control"
+    },
+    {
+      "id": "HMS-INJ-001",
+      "name": "Legacy search query handling",
+      "objective": "Determine whether q is bound as a parameter.",
+      "preconditions": "Logged in with patients.read_all.",
+      "test_account": "receptionist.lindqvist",
+      "target_component": "GET /api/lab/patients/legacy-search",
+      "expected_result": "A quote in q is treated as data; tautology payload does not widen results.",
+      "finding_id": "HMS-V01",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-INJ-002",
+      "name": "Secure patient search (control)",
+      "objective": "Confirm GET /api/patients?q= treats input as data.",
+      "preconditions": "None.",
+      "test_account": "receptionist.lindqvist",
+      "target_component": "GET /api/patients",
+      "expected_result": "Tautology payload returns 0 rows.",
+      "finding_id": null,
+      "kind": "security-control"
+    },
+    {
+      "id": "HMS-XSS-001",
+      "name": "Output encoding of patient notes",
+      "objective": "Determine whether notes HTML is interpreted when rendered.",
+      "preconditions": "Writer and viewer accounts.",
+      "test_account": "doctor.mehta",
+      "target_component": "Patient detail page",
+      "expected_result": "Markup is displayed as text.",
+      "finding_id": "HMS-V02",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-UPL-001",
+      "name": "Upload validation",
+      "objective": "Determine whether uploads are validated beyond the declared type.",
+      "preconditions": "Synthetic harmless file.",
+      "test_account": "receptionist.lindqvist",
+      "target_component": "Patient document upload",
+      "expected_result": "HTML disguised as PNG is rejected; downloads are attachment+nosniff.",
+      "finding_id": "HMS-V08",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-CFG-001",
+      "name": "Security headers",
+      "objective": "Compare security headers across routes.",
+      "preconditions": "Logged in as billing officer.",
+      "test_account": "billing.nakamura",
+      "target_component": "Invoice routes",
+      "expected_result": "All routes send X-Frame-Options, CSP, X-Content-Type-Options.",
+      "finding_id": "HMS-V09",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-INF-001",
+      "name": "Error message disclosure",
+      "objective": "Determine whether errors reveal internals.",
+      "preconditions": "Logged in as pharmacist.",
+      "test_account": "pharmacist.rossi",
+      "target_component": "Medication lookup",
+      "expected_result": "Generic error, no SQL/stack text.",
+      "finding_id": "HMS-V10",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-API-001",
+      "name": "Profile update field allow-list",
+      "objective": "Determine whether unlisted fields are applied.",
+      "preconditions": "Logged in as low-privilege user.",
+      "test_account": "nurse.okafor",
+      "target_component": "PATCH /api/profile",
+      "expected_result": "Unlisted fields rejected; role unchanged.",
+      "finding_id": "HMS-V05",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-CSRF-001",
+      "name": "CSRF controls on state changes",
+      "objective": "Determine whether state-changing requests require an anti-CSRF token.",
+      "preconditions": "Scheduled appointment.",
+      "test_account": "receptionist.lindqvist",
+      "target_component": "Appointment cancel",
+      "expected_result": "Requests without X-CSRF-Token are rejected (403).",
+      "finding_id": "HMS-V11",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-PTH-001",
+      "name": "Resource path handling",
+      "objective": "Determine whether file selection is confined to the intended directory.",
+      "preconditions": "Logged in with lab.read.",
+      "test_account": "labtech.alvarez",
+      "target_component": "Lab report download",
+      "expected_result": "Only public-docs files are served.",
+      "finding_id": "HMS-V12",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-SAF-001",
+      "name": "Manifest and evidence not publicly served (control)",
+      "objective": "Confirm assessment data is only reachable via assessor permissions.",
+      "preconditions": "None.",
+      "test_account": "admin.hartley",
+      "target_component": "/api/assessment/*",
+      "expected_result": "Ordinary administrator receives 403.",
+      "finding_id": null,
+      "kind": "security-control"
+    },
+    {
+      "id": "HMS-SSRF-001",
+      "name": "Server-side request destinations",
+      "objective": "Determine whether user-supplied URLs can reach internal services.",
+      "preconditions": "",
+      "test_account": "pharmacist.rossi",
+      "target_component": "GET /api/lab/integrations/fetch",
+      "expected_result": "Internal and loopback destinations are refused.",
+      "finding_id": "HMS-V13",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-RED-001",
+      "name": "Redirect target validation",
+      "objective": "Determine whether redirects are limited to local paths.",
+      "preconditions": "",
+      "test_account": "anonymous",
+      "target_component": "GET /api/lab/auth/redirect",
+      "expected_result": "External targets are rejected.",
+      "finding_id": "HMS-V14",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-JWT-001",
+      "name": "Token signature verification",
+      "objective": "Determine whether unsigned tokens are accepted.",
+      "preconditions": "",
+      "test_account": "admin.hartley",
+      "target_component": "GET /api/lab/token-admin/summary",
+      "expected_result": "Unsigned or tampered tokens are rejected (401).",
+      "finding_id": "HMS-V15",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-INJ-003",
+      "name": "Blind injection resistance",
+      "objective": "Determine whether MRN lookup is parameterised.",
+      "preconditions": "",
+      "test_account": "receptionist.lindqvist",
+      "target_component": "GET /api/lab/patients/exists",
+      "expected_result": "Injected conditions do not change the result.",
+      "finding_id": "HMS-V16",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-XSS-002",
+      "name": "Reflected output encoding",
+      "objective": "Determine whether query text is encoded in HTML responses.",
+      "preconditions": "",
+      "test_account": "anonymous",
+      "target_component": "GET /api/lab/search-page",
+      "expected_result": "Markup in q is shown as text.",
+      "finding_id": "HMS-V17",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-AC-007",
+      "name": "Login error uniformity",
+      "objective": "Determine whether login errors reveal account existence.",
+      "preconditions": "",
+      "test_account": "anonymous",
+      "target_component": "POST /api/auth/login",
+      "expected_result": "Identical response for unknown user and wrong password.",
+      "finding_id": "HMS-V18",
+      "kind": "expected-vulnerability"
+    },
+    {
+      "id": "HMS-INF-002",
+      "name": "Diagnostic endpoint exposure",
+      "objective": "Determine whether diagnostics are reachable without authentication.",
+      "preconditions": "",
+      "test_account": "anonymous",
+      "target_component": "GET /api/lab/debug/config",
+      "expected_result": "401/404 for anonymous callers.",
+      "finding_id": "HMS-V19",
+      "kind": "expected-vulnerability"
+    }
+  ]
+}

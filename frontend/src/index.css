@@ -1,0 +1,78 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #f4f7fb;
+  --surface: #ffffff;
+  --surface-2: #eef2f7;
+  --border: #e0e7f0;
+  --text: #17222f;
+  --muted: #566577;
+  --primary: #0e7490;
+  --primary-fg: #ffffff;
+  --nav: #0b1f33;
+  --nav-fg: #c9d6e8;
+  --nav-active: #14425a;
+  --ok: #0a7d4f;
+  --warn: #8a5a00;
+  --danger: #b4232c;
+  --info: #0b5cab;
+  --chart-1: #0e7490;
+  --chart-2: #2f80ed;
+  --chart-3: #c9830f;
+  --chart-4: #7b4fd1;
+}
+.dark {
+  --bg: #0b1320;
+  --surface: #131d2e;
+  --surface-2: #1b2840;
+  --border: #2a3a55;
+  --text: #e6edf6;
+  --muted: #9fb0c6;
+  --primary: #38bdd8;
+  --primary-fg: #04111f;
+  --nav: #070e19;
+  --nav-fg: #b7c6dc;
+  --nav-active: #172742;
+  --ok: #4cd9a0;
+  --warn: #f0b84a;
+  --danger: #ff8189;
+  --info: #7cc0ff;
+  --chart-1: #38bdd8;
+  --chart-2: #6ea8ff;
+  --chart-3: #f0b84a;
+  --chart-4: #b79bff;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface-2);
+  --color-line: var(--border);
+  --color-ink: var(--text);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primaryfg: var(--primary-fg);
+  --color-nav: var(--nav);
+  --color-navfg: var(--nav-fg);
+  --color-navactive: var(--nav-active);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --font-sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+}
+
+html { color-scheme: light; }
+html.dark { color-scheme: dark; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-sans); font-size: 14px; line-height: 1.45; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.sr-only-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+.card-shadow { box-shadow: 0 1px 2px rgb(16 42 67 / 0.05), 0 1px 3px rgb(16 42 67 / 0.04); }
+.dark .card-shadow { box-shadow: none; }
+table thead th { background: color-mix(in srgb, var(--surface-2) 70%, transparent); }
+input, select, textarea { transition: border-color .15s, box-shadow .15s; }
+input:focus, select:focus, textarea:focus { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
+.hero { background: linear-gradient(160deg, #0b1f33ee 0%, #0e3a52cc 55%, #0e7490aa 130%), url('/img/hospital/h5.jpg') center / cover no-repeat; }

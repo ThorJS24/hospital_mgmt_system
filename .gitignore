@@ -1,0 +1,30 @@
+node_modules/
+dist/
+.env
+.pglite*/
+.pglite/
+backend/.pglite*/
+*.log
+test-results/
+playwright-report/
+e2e/shots/
+*.tmp.mjs
+shot-*.png
+# runtime output (kept out of git; directories are recreated on demand)
+assessment/evidence/files/
+assessment/reports/out/
+lab-data/uploads/
+
+# local verification tooling and artefacts (not part of the repository)
+e2e/
+playwright.config.ts
+backend/tests/
+backend/vitest.config.ts
+frontend/src/**/*.test.ts
+**/*.test.ts
+**/*.spec.ts
+coverage/
+.vitest-cache/
+*.tmp.*
+tmp/
+.claude/

@@ -1,0 +1,6 @@
+# Explicit opt-in: enables the documented intentionally vulnerable assessment scenarios.
+# Still loopback-only (see docker-compose.yml). Never publish these ports beyond 127.0.0.1.
+services:
+  backend:
+    environment:
+      LAB_MODE: vulnerable

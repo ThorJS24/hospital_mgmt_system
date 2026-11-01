@@ -14,6 +14,15 @@ All people, records, SSNs, insurance numbers and card numbers are **fabricated**
 - **UI:** clinical design system, light/dark theme, responsive tables, accessible dialogs/forms, portraits and hospital photography (bundled locally).
 - **Assessment area (assessor only):** test-case register, findings with status workflow, evidence with SHA-256 and secret redaction, separate coverage metrics, CSV/JSON/HTML export.
 
+## Screenshots
+
+| | |
+|---|---|
+| ![Login](docs/screenshots/01-login.png)<br>**Sign in** | ![Dashboard](docs/screenshots/02-dashboard.png)<br>**Live dashboard** |
+| ![Dark theme](docs/screenshots/03-dashboard-dark.png)<br>**Dark theme** | ![Patient record](docs/screenshots/05-patient-detail.png)<br>**Patient record** (masked identifiers, insurance) |
+| ![Weekly schedule](docs/screenshots/07-schedule.png)<br>**Weekly schedule** | ![Admissions](docs/screenshots/08-admissions.png)<br>**Wards and beds** |
+| ![Staff directory](docs/screenshots/09-staff.png)<br>**Staff directory** | ![Assessment](docs/screenshots/10-assessment.png)<br>**Assessment area** (assessor role) |
+
 ## Stack
 React 19, TypeScript, Vite, Tailwind 4, React Router, Recharts, Lucide · Express 5, Zod 4 · PostgreSQL 16 (Docker) or embedded PGlite (default, no Docker needed).
 

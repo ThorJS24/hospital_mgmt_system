@@ -2,36 +2,36 @@
   "test_cases": [
     {
       "id": "HMS-AC-001",
-      "name": "Password reset token strength",
+      "name": "Password reset token strength (control)",
       "objective": "Determine whether reset tokens are unpredictable and attempt-limited.",
       "preconditions": "Lab running; synthetic account exists.",
       "test_account": "nurse.okafor",
       "target_component": "POST /api/auth/password-reset/confirm",
-      "expected_result": "Tokens are random, expire, and are invalidated after 5 wrong attempts (HTTP 429/400).",
-      "finding_id": "HMS-V06",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: Tokens are random, expire, and are invalidated after 5 wrong attempts (HTTP 429/400).",
+      "finding_id": null,
+      "kind": "security-control"
     },
     {
       "id": "HMS-AC-002",
-      "name": "Session identifier rotation on login",
+      "name": "Session identifier rotation on login (control)",
       "objective": "Verify that the session identifier changes at authentication.",
       "preconditions": "Anonymous session obtained from GET /api/auth/session.",
       "test_account": "receptionist.lindqvist",
       "target_component": "POST /api/auth/login",
-      "expected_result": "sid cookie differs before and after login; old sid is invalid.",
-      "finding_id": "HMS-V07",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: sid cookie differs before and after login; old sid is invalid.",
+      "finding_id": null,
+      "kind": "security-control"
     },
     {
       "id": "HMS-AC-003",
-      "name": "Function-level authorization on audit data",
+      "name": "Function-level authorization on audit data (control)",
       "objective": "Verify only audit.read holders can read audit events.",
       "preconditions": "Logged in as non-admin.",
       "test_account": "receptionist.lindqvist",
       "target_component": "/api/admin/audit and /api/lab/admin/audit-export",
-      "expected_result": "403 for non-admin roles on both routes.",
-      "finding_id": "HMS-V04",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: 403 for non-admin roles on both routes.",
+      "finding_id": null,
+      "kind": "security-control"
     },
     {
       "id": "HMS-AC-004",
@@ -68,14 +68,14 @@
     },
     {
       "id": "HMS-INJ-001",
-      "name": "Legacy search query handling",
+      "name": "Legacy search query handling (control)",
       "objective": "Determine whether q is bound as a parameter.",
       "preconditions": "Logged in with patients.read_all.",
       "test_account": "receptionist.lindqvist",
       "target_component": "GET /api/lab/patients/legacy-search",
-      "expected_result": "A quote in q is treated as data; tautology payload does not widen results.",
-      "finding_id": "HMS-V01",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: A quote in q is treated as data; tautology payload does not widen results.",
+      "finding_id": null,
+      "kind": "security-control"
     },
     {
       "id": "HMS-INJ-002",
@@ -90,36 +90,36 @@
     },
     {
       "id": "HMS-XSS-001",
-      "name": "Output encoding of patient notes",
+      "name": "Output encoding of patient notes (control)",
       "objective": "Determine whether notes HTML is interpreted when rendered.",
       "preconditions": "Writer and viewer accounts.",
       "test_account": "doctor.mehta",
       "target_component": "Patient detail page",
-      "expected_result": "Markup is displayed as text.",
-      "finding_id": "HMS-V02",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: Markup is displayed as text.",
+      "finding_id": null,
+      "kind": "security-control"
     },
     {
       "id": "HMS-UPL-001",
-      "name": "Upload validation",
+      "name": "Upload validation (control)",
       "objective": "Determine whether uploads are validated beyond the declared type.",
       "preconditions": "Synthetic harmless file.",
       "test_account": "receptionist.lindqvist",
       "target_component": "Patient document upload",
-      "expected_result": "HTML disguised as PNG is rejected; downloads are attachment+nosniff.",
-      "finding_id": "HMS-V08",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: HTML disguised as PNG is rejected; downloads are attachment+nosniff.",
+      "finding_id": null,
+      "kind": "security-control"
     },
     {
       "id": "HMS-CFG-001",
-      "name": "Security headers",
+      "name": "Security headers (control)",
       "objective": "Compare security headers across routes.",
       "preconditions": "Logged in as billing officer.",
       "test_account": "billing.nakamura",
       "target_component": "Invoice routes",
-      "expected_result": "All routes send X-Frame-Options, CSP, X-Content-Type-Options.",
-      "finding_id": "HMS-V09",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: All routes send X-Frame-Options, CSP, X-Content-Type-Options.",
+      "finding_id": null,
+      "kind": "security-control"
     },
     {
       "id": "HMS-INF-001",
@@ -134,36 +134,36 @@
     },
     {
       "id": "HMS-API-001",
-      "name": "Profile update field allow-list",
+      "name": "Profile update field allow-list (control)",
       "objective": "Determine whether unlisted fields are applied.",
       "preconditions": "Logged in as low-privilege user.",
       "test_account": "nurse.okafor",
       "target_component": "PATCH /api/profile",
-      "expected_result": "Unlisted fields rejected; role unchanged.",
-      "finding_id": "HMS-V05",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: Unlisted fields rejected; role unchanged.",
+      "finding_id": null,
+      "kind": "security-control"
     },
     {
       "id": "HMS-CSRF-001",
-      "name": "CSRF controls on state changes",
+      "name": "CSRF controls on state changes (control)",
       "objective": "Determine whether state-changing requests require an anti-CSRF token.",
       "preconditions": "Scheduled appointment.",
       "test_account": "receptionist.lindqvist",
       "target_component": "Appointment cancel",
-      "expected_result": "Requests without X-CSRF-Token are rejected (403).",
-      "finding_id": "HMS-V11",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: Requests without X-CSRF-Token are rejected (403).",
+      "finding_id": null,
+      "kind": "security-control"
     },
     {
       "id": "HMS-PTH-001",
-      "name": "Resource path handling",
+      "name": "Resource path handling (control)",
       "objective": "Determine whether file selection is confined to the intended directory.",
       "preconditions": "Logged in with lab.read.",
       "test_account": "labtech.alvarez",
       "target_component": "Lab report download",
-      "expected_result": "Only public-docs files are served.",
-      "finding_id": "HMS-V12",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: Only public-docs files are served.",
+      "finding_id": null,
+      "kind": "security-control"
     },
     {
       "id": "HMS-SAF-001",
@@ -178,14 +178,14 @@
     },
     {
       "id": "HMS-SSRF-001",
-      "name": "Server-side request destinations",
+      "name": "Server-side request destinations (control)",
       "objective": "Determine whether user-supplied URLs can reach internal services.",
       "preconditions": "",
       "test_account": "pharmacist.rossi",
       "target_component": "GET /api/lab/integrations/fetch",
-      "expected_result": "Internal and loopback destinations are refused.",
-      "finding_id": "HMS-V13",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: Internal and loopback destinations are refused.",
+      "finding_id": null,
+      "kind": "security-control"
     },
     {
       "id": "HMS-RED-001",
@@ -200,25 +200,25 @@
     },
     {
       "id": "HMS-JWT-001",
-      "name": "Token signature verification",
+      "name": "Token signature verification (control)",
       "objective": "Determine whether unsigned tokens are accepted.",
       "preconditions": "",
       "test_account": "admin.hartley",
       "target_component": "GET /api/lab/token-admin/summary",
-      "expected_result": "Unsigned or tampered tokens are rejected (401).",
-      "finding_id": "HMS-V15",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: Unsigned or tampered tokens are rejected (401).",
+      "finding_id": null,
+      "kind": "security-control"
     },
     {
       "id": "HMS-INJ-003",
-      "name": "Blind injection resistance",
+      "name": "Blind injection resistance (control)",
       "objective": "Determine whether MRN lookup is parameterised.",
       "preconditions": "",
       "test_account": "receptionist.lindqvist",
       "target_component": "GET /api/lab/patients/exists",
-      "expected_result": "Injected conditions do not change the result.",
-      "finding_id": "HMS-V16",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: Injected conditions do not change the result.",
+      "finding_id": null,
+      "kind": "security-control"
     },
     {
       "id": "HMS-XSS-002",
@@ -244,14 +244,14 @@
     },
     {
       "id": "HMS-INF-002",
-      "name": "Diagnostic endpoint exposure",
+      "name": "Diagnostic endpoint exposure (control)",
       "objective": "Determine whether diagnostics are reachable without authentication.",
       "preconditions": "",
       "test_account": "anonymous",
       "target_component": "GET /api/lab/debug/config",
-      "expected_result": "401/404 for anonymous callers.",
-      "finding_id": "HMS-V19",
-      "kind": "expected-vulnerability"
+      "expected_result": "Remediated: 401/404 for anonymous callers.",
+      "finding_id": null,
+      "kind": "security-control"
     }
   ]
 }

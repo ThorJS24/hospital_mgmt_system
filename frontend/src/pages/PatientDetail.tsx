@@ -35,7 +35,7 @@ export default function PatientDetail() {
             <Card title="Insurance & identifiers"><dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"><KV label="Insurance provider">{p.insurance_provider}</KV><KV label="Policy number"><span className="font-mono">{p.insurance_policy_masked}</span></KV><KV label="Group number">{p.insurance_group_no}</KV><KV label="National ID (SSN)"><span className="font-mono">{p.ssn_masked}</span></KV><KV label="Driver licence"><span className="font-mono">{p.drivers_license_masked}</span></KV></dl><p className="mt-3 text-xs text-muted">Identifiers are masked; synthetic values only.</p></Card>
             <Card title="Emergency contacts">{p.contacts.length ? <ul className="divide-y divide-line">{p.contacts.map((c: any) => <li key={c.id} className="flex flex-wrap justify-between gap-2 py-1.5"><span>{c.name} <span className="text-muted">({c.relationship})</span></span><span>{c.phone}</span></li>)}</ul> : <EmptyState title="No contacts" />}</Card>
             {lab.mode === 'vulnerable' && can('clinical.read') && <a className="text-sm text-primary hover:underline" target="_blank" rel="noreferrer" href={`/api/lab/patients/${p.id}/summary`}>Open legacy clinical summary</a>}
-            {p.history && <Card title="Clinical notes"><ClinicalNote text={p.notes} />{lab.unsafeNotes && <p className="mt-2 text-xs text-muted">Lab mode: notes are rendered as formatted content.</p>}</Card>}
+            {p.history && <Card title="Clinical notes"><ClinicalNote text={p.notes} /></Card>}
           </>
         ))}
         {tab === 'appointments' && <Card title="Appointments">{p.appointments.length ? <Rows head={['When', 'Doctor', 'Department', 'Reason', 'Status']} rows={p.appointments.map((a: any) => [fmtDateTime(a.scheduled_at), a.doctor, a.department, a.reason, <StatusBadge key="s" status={a.status} />])} /> : <EmptyState title="No appointments" />}</Card>}
@@ -106,16 +106,15 @@ function Clinical({ p, reload }: { p: any; reload: () => void }) {
 }
 
 function Documents({ p, reload }: { p: any; reload: () => void }) {
-  const { lab } = useAuth(); const toast = useToast();
+  const toast = useToast();
   const ref = useRef<HTMLInputElement>(null);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
-  const base = lab.mode === 'vulnerable' ? '/api/lab' : '/api';
   const upload = async (file: File) => {
     setBusy(true); setErr('');
     try {
       if (file.size > 512 * 1024) throw new Error('File exceeds the 512 KB limit');
       const content_base64 = toBase64(await file.arrayBuffer());
-      await post(`${base}/patients/${p.id}/documents`, lab.mode === 'vulnerable' ? { filename: file.name, content_type: file.type || 'text/plain', content_base64 } : { filename: file.name, content_base64 });
+      await post(`/api/patients/${p.id}/documents`, { filename: file.name, content_base64 });
       toast('Document uploaded'); reload();
     } catch (x) { setErr(errMsg(x)); }
     setBusy(false); if (ref.current) ref.current.value = '';
@@ -124,7 +123,7 @@ function Documents({ p, reload }: { p: any; reload: () => void }) {
     <Card title="Documents" actions={<><input ref={ref} type="file" className="sr-only-live" id="doc-upload" aria-label="Choose document" onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} /><Button loading={busy} onClick={() => ref.current?.click()}><Upload className="h-4 w-4" />Upload</Button></>}>
       <p className="mb-2 text-xs text-muted">Accepted: PDF, PNG, JPG, TXT up to 512 KB. Synthetic files only.</p>
       {err && <Alert>{err}</Alert>}
-      {p.documents.length ? <Rows head={['File', 'Type', 'Size', 'Uploaded', '']} rows={p.documents.map((d: any) => [d.filename, d.content_type, `${(d.size_bytes / 1024).toFixed(1)} KB`, fmtDateTime(d.created_at), <a key="a" className="text-primary hover:underline" target="_blank" rel="noreferrer" href={`${base}/documents/${d.id}`}>Open</a>])} /> : <EmptyState title="No documents" />}
+      {p.documents.length ? <Rows head={['File', 'Type', 'Size', 'Uploaded', '']} rows={p.documents.map((d: any) => [d.filename, d.content_type, `${(d.size_bytes / 1024).toFixed(1)} KB`, fmtDateTime(d.created_at), <a key="a" className="text-primary hover:underline" target="_blank" rel="noreferrer" href={`/api/documents/${d.id}`}>Open</a>])} /> : <EmptyState title="No documents" />}
     </Card>
   );
 }

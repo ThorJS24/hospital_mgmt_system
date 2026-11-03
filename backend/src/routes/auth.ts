@@ -5,7 +5,6 @@ import { audit, createSession, loadUser, requireAuth, setSessionCookie, SESSION_
 import { HttpError, parse } from '../utils/http.js';
 import { hashPassword, randomToken, verifyPassword } from '../utils/crypto.js';
 import { isVulnEnabled } from '../config/index.js';
-import { applyProfileUpdateUnsafely, upgradeSessionInPlace, weakResetToken } from '../assessment/vulnerable/inline.js';
 import { log } from '../utils/logger.js';
 
 const passwordRule = z.string().min(10, 'Use at least 10 characters').max(128);
@@ -22,7 +21,7 @@ export function authRoutes({ db, cfg }: Ctx) {
       authenticated: !!req.user,
       user: req.user ? publicUser(req.user) : null,
       csrfToken: req.sess.csrf,
-      lab: { mode: cfg.labMode, unsafeNotes: isVulnEnabled(cfg, 'HMS-V02'), banner: 'ACADEMIC SECURITY LAB — SYNTHETIC DATA ONLY — NOT FOR CLINICAL USE' },
+      lab: { mode: cfg.labMode, banner: 'ACADEMIC SECURITY LAB — SYNTHETIC DATA ONLY — NOT FOR CLINICAL USE' },
     });
   });
 
@@ -49,16 +48,11 @@ export function authRoutes({ db, cfg }: Ctx) {
     }
     await db.query('UPDATE users SET failed_logins=0, locked_until=NULL WHERE id=$1', [u.id]);
 
-    let csrf = req.sess.csrf;
-    if (isVulnEnabled(cfg, 'HMS-V07')) {
-      // HMS-V07: session identifier is kept (fixation)
-      await upgradeSessionInPlace(db, req.sess.id, u.id);
-    } else {
-      await db.query('DELETE FROM sessions WHERE id=$1', [req.sess.id]);
-      const s = await createSession(db, cfg, u.id);
-      setSessionCookie(res, cfg, s.id);
-      csrf = s.csrf;
-    }
+    // Rotate the session identifier on login (prevents session fixation).
+    await db.query('DELETE FROM sessions WHERE id=$1', [req.sess.id]);
+    const s = await createSession(db, cfg, u.id);
+    setSessionCookie(res, cfg, s.id);
+    const csrf = s.csrf;
     req.sess.userId = u.id;
     req.user = null;
     const user = await loadUser(db, u.id);
@@ -76,17 +70,12 @@ export function authRoutes({ db, cfg }: Ctx) {
 
   // ---- profile -----------------------------------------------------------
   r.patch('/profile', requireAuth, async (req, res) => {
-    if (isVulnEnabled(cfg, 'HMS-V05')) {
-      await applyProfileUnsafe(req.user!.id, req.body ?? {});
-    } else {
-      const body = parse(z.object({ full_name: z.string().min(2).max(100).optional(), email: z.email().max(200).optional() }).strict(), req.body);
-      if (body.full_name) await db.query('UPDATE users SET full_name=$1 WHERE id=$2', [body.full_name, req.user!.id]);
-      if (body.email) await db.query('UPDATE users SET email=$1 WHERE id=$2', [body.email, req.user!.id]);
-    }
+    const body = parse(z.object({ full_name: z.string().min(2).max(100).optional(), email: z.email().max(200).optional() }).strict(), req.body);
+    if (body.full_name) await db.query('UPDATE users SET full_name=$1 WHERE id=$2', [body.full_name, req.user!.id]);
+    if (body.email) await db.query('UPDATE users SET email=$1 WHERE id=$2', [body.email, req.user!.id]);
     await audit(db, req, 'profile_update', 'user', req.user!.id);
     res.json({ user: await loadUser(db, req.user!.id) });
   });
-  const applyProfileUnsafe = (id: number, body: Record<string, unknown>) => applyProfileUpdateUnsafely(db, id, body);
 
   r.post('/profile/password', requireAuth, async (req, res) => {
     const b = parse(z.object({ current_password: z.string().min(1), new_password: passwordRule }), req.body);
@@ -103,8 +92,7 @@ export function authRoutes({ db, cfg }: Ctx) {
     const { username } = parse(z.object({ username: z.string().min(1).max(64) }), req.body);
     const { rows } = await db.query('SELECT id FROM users WHERE username=$1 AND active', [username]);
     if (rows[0]) {
-      const weak = isVulnEnabled(cfg, 'HMS-V06');
-      const token = weak ? weakResetToken() : randomToken(24);
+      const token = randomToken(24);
       await db.query('UPDATE reset_tokens SET used=true WHERE user_id=$1', [rows[0].id]);
       await db.query("INSERT INTO reset_tokens(user_id,token,expires_at) VALUES ($1,$2, now() + interval '30 minutes')", [rows[0].id, token]);
       await audit(db, req, 'password_reset_requested', 'user', rows[0].id);
@@ -121,13 +109,12 @@ export function authRoutes({ db, cfg }: Ctx) {
     );
     const t = rows[0];
     if (!t) throw new HttpError(400, 'Invalid or expired reset code');
-    const limited = !isVulnEnabled(cfg, 'HMS-V06');
-    if (limited && t.attempts >= 5) {
+    if (t.attempts >= 5) {
       await db.query('UPDATE reset_tokens SET used=true WHERE id=$1', [t.id]);
       throw new HttpError(429, 'Too many attempts. Request a new code.');
     }
     if (t.token !== b.token) {
-      if (limited) await db.query('UPDATE reset_tokens SET attempts=attempts+1 WHERE id=$1', [t.id]);
+      await db.query('UPDATE reset_tokens SET attempts=attempts+1 WHERE id=$1', [t.id]);
       throw new HttpError(400, 'Invalid or expired reset code');
     }
     await db.query('UPDATE reset_tokens SET used=true WHERE id=$1', [t.id]);

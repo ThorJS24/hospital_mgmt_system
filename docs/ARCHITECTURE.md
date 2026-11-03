@@ -14,7 +14,7 @@ The Vite dev server proxies `/api` to the backend, so the SPA and API share an o
 ## Backend
 - **Config:** `backend/src/config` reads the environment once. `assertSafeBinding` enforces loopback binding in vulnerable mode.
 - **Database:** `db/index.ts` exposes one `Db` interface backed by `pg` (when `DATABASE_URL` is set) or PGlite. SQL migrations in `backend/migrations` (`001` core, `002` assessment, `003` extended patient data) are tracked in `schema_migrations`. `db/seed.ts` is deterministic and idempotent for assessment definitions; clinical data is rebuilt by `TRUNCATE … RESTART IDENTITY`.
-- **Sessions:** server-side `sessions` table, opaque 192-bit ids, rotation at login (the fixation scenario disables this), idle expiry. Every unsafe request needs the session-bound `X-CSRF-Token`.
+- **Sessions:** server-side `sessions` table, opaque 192-bit ids, rotation at login, idle expiry. Every unsafe request needs the session-bound `X-CSRF-Token`.
 - **Authorization:** `services/permissions.ts` is the single permission matrix (seeded into `roles`/`permissions`/`role_permissions`). `requirePermission` guards routes; `services/patients.ts` (`scopeClause`, `canAccessPatient`) implements object-level scoping: doctors see their care team, nurses their department, others by permission. Hospital administrators have no `assessment.*` permissions.
 - **Validation:** zod schemas at the trust boundary; list endpoints use whitelisted `ORDER BY` columns and bound parameters.
 - **Live data:** `services/live.ts` is an in-process event bus feeding `GET /api/live` (SSE). `services/simulator.ts` makes synthetic changes every few seconds. Event messages contain no patient identity.

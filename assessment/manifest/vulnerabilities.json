@@ -4,49 +4,6 @@
   "note": "INTERNAL - lists intentionally introduced weaknesses. A manifest entry is NOT evidence that the weakness exists in a running build; findings are only confirmed through recorded assessment evidence.",
   "vulnerabilities": [
     {
-      "id": "HMS-V01",
-      "title": "SQL injection in legacy patient search",
-      "category": "Injection",
-      "cwe": "CWE-89",
-      "owasp_category": "A03:2021 Injection",
-      "affected_component": "Patients / legacy search",
-      "affected_route": "GET /api/lab/patients/legacy-search?q=",
-      "vulnerability_type": "SQL Injection (string concatenation)",
-      "intended_weakness": "The q parameter is concatenated into a SELECT statement instead of being bound as a parameter. The secure search (GET /api/patients?q=) uses bound parameters.",
-      "expected_observation": "A single quote in q produces a database error or altered result set; a boolean-true payload returns every patient record regardless of the search term.",
-      "assessment_method": "Manual request tampering in Burp/DevTools and ZAP active scan (SQL Injection rules) as a user holding patients.read_all (e.g. receptionist).",
-      "evidence_requirements": "Request/response metadata for a benign and a tampered query, result counts, HTTP status.",
-      "severity_rationale": "Pending assessment. Factors: authenticated precondition, read access to synthetic data in the same database, no write primitive demonstrated.",
-      "remediation": "Use parameterized queries (WHERE last_name ILIKE $1) and remove the legacy route.",
-      "remediation_reference": "OWASP SQL Injection Prevention Cheat Sheet",
-      "test_case_ids": [
-        "HMS-INJ-001",
-        "HMS-INJ-002"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "HMS-V02",
-      "title": "Stored cross-site scripting in patient clinical notes",
-      "category": "Cross-Site Scripting",
-      "cwe": "CWE-79",
-      "owasp_category": "A03:2021 Injection",
-      "affected_component": "Patients / detail view (clinical notes)",
-      "affected_route": "PATCH /api/patients/:id (notes) rendered in /patients/:id",
-      "vulnerability_type": "Stored XSS (unsafe HTML rendering)",
-      "intended_weakness": "In vulnerable mode the patient detail page renders the notes field as raw HTML. In secure mode the same field is rendered as text.",
-      "expected_observation": "Markup stored in notes is interpreted by the browser when the record is opened (use a harmless marker such as <b>marker</b> or an alert-free DOM change).",
-      "assessment_method": "Store a benign HTML marker in notes as a doctor/receptionist, open the record, inspect the DOM.",
-      "evidence_requirements": "Stored payload (benign), screenshot or DOM excerpt showing interpreted markup.",
-      "severity_rationale": "Pending assessment. Factors: authenticated writer, viewer is another staff member, session cookie is HttpOnly.",
-      "remediation": "Render notes as text (React default escaping); if rich text is required, sanitise with an allow-list sanitiser and set a restrictive CSP.",
-      "remediation_reference": "OWASP XSS Prevention Cheat Sheet",
-      "test_case_ids": [
-        "HMS-XSS-001"
-      ],
-      "status": "implemented"
-    },
-    {
       "id": "HMS-V03",
       "title": "Broken object-level authorization on patient summary",
       "category": "Broken Access Control",
@@ -65,132 +22,6 @@
       "test_case_ids": [
         "HMS-AC-004",
         "HMS-AC-005"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "HMS-V04",
-      "title": "Missing function-level authorization on audit export",
-      "category": "Broken Access Control",
-      "cwe": "CWE-862",
-      "owasp_category": "A01:2021 Broken Access Control",
-      "affected_component": "Administration / audit export",
-      "affected_route": "GET /api/lab/admin/audit-export",
-      "vulnerability_type": "Missing permission check",
-      "intended_weakness": "The route requires a session but omits the audit.read permission check enforced on GET /api/admin/audit.",
-      "expected_observation": "A receptionist or pharmacist receives audit events; the secure route returns 403.",
-      "assessment_method": "Call both routes with a low-privilege account.",
-      "evidence_requirements": "Status codes for both routes for the same account.",
-      "severity_rationale": "Pending assessment. Factors: disclosure of staff activity metadata, authenticated precondition.",
-      "remediation": "Add requirePermission('audit.read') and a negative test for every non-admin role.",
-      "remediation_reference": "OWASP ASVS V4.1",
-      "test_case_ids": [
-        "HMS-AC-003"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "HMS-V05",
-      "title": "Mass assignment on profile update",
-      "category": "Mass Assignment",
-      "cwe": "CWE-915",
-      "owasp_category": "A04:2021 Insecure Design",
-      "affected_component": "Authentication / profile",
-      "affected_route": "PATCH /api/profile",
-      "vulnerability_type": "Over-permissive field binding",
-      "intended_weakness": "The documented contract allows full_name and email. In vulnerable mode additional columns such as role_code are accepted and applied.",
-      "expected_observation": "Sending role_code changes the caller's role; in secure mode the field is ignored/rejected.",
-      "assessment_method": "Send an extra field as a low-privilege synthetic account and re-read /api/auth/session.",
-      "evidence_requirements": "Request body keys (no secrets), before/after role in session response.",
-      "severity_rationale": "Pending assessment. Factors: privilege escalation to administrator within the lab.",
-      "remediation": "Use a strict zod schema (.strict()) containing only full_name and email.",
-      "remediation_reference": "OWASP API Security Top 10 2023 API3",
-      "test_case_ids": [
-        "HMS-API-001"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "HMS-V06",
-      "title": "Weak password-reset token without attempt limiting",
-      "category": "Authentication",
-      "cwe": "CWE-330",
-      "owasp_category": "A07:2021 Identification and Authentication Failures",
-      "affected_component": "Authentication / password reset",
-      "affected_route": "POST /api/auth/password-reset/confirm",
-      "vulnerability_type": "Predictable token, no brute-force protection",
-      "intended_weakness": "In vulnerable mode reset tokens are 4-digit numbers and the confirm endpoint does not count attempts. Secure mode issues 192-bit random tokens with a 5-attempt limit.",
-      "expected_observation": "The token space (10,000) can be exhausted against a synthetic account within the lab; no lockout response is returned.",
-      "assessment_method": "Request a reset for a synthetic account and send a bounded number of guesses; observe the absence of throttling (do not run unbounded loops).",
-      "evidence_requirements": "Token format description, number of attempts accepted without throttling, response codes.",
-      "severity_rationale": "Pending assessment. Factors: account takeover of synthetic accounts, requires knowing a username.",
-      "remediation": "Generate tokens with randomBytes(24), expire in 30 minutes, count attempts and invalidate after 5.",
-      "remediation_reference": "OWASP Forgot Password Cheat Sheet",
-      "test_case_ids": [
-        "HMS-AC-001"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "HMS-V07",
-      "title": "Session fixation: session identifier not rotated on login",
-      "category": "Session Management",
-      "cwe": "CWE-384",
-      "owasp_category": "A07:2021 Identification and Authentication Failures",
-      "affected_component": "Authentication / login",
-      "affected_route": "POST /api/auth/login",
-      "vulnerability_type": "Session fixation",
-      "intended_weakness": "In vulnerable mode the pre-login session identifier is retained and upgraded on successful login instead of being replaced.",
-      "expected_observation": "The sid cookie value before and after login is identical; a second client holding the pre-login sid is authenticated.",
-      "assessment_method": "Record the sid cookie before login, log in, compare, replay the old sid from a separate client.",
-      "evidence_requirements": "Cookie names and a boolean 'identifier unchanged' (never the raw token value).",
-      "severity_rationale": "Pending assessment. Factors: requires the attacker to plant a known sid in the victim browser.",
-      "remediation": "Issue a fresh session identifier on privilege change and delete the old session row.",
-      "remediation_reference": "OWASP Session Management Cheat Sheet",
-      "test_case_ids": [
-        "HMS-AC-002"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "HMS-V08",
-      "title": "Insufficient file-upload validation for patient documents",
-      "category": "File Upload",
-      "cwe": "CWE-434",
-      "owasp_category": "A04:2021 Insecure Design",
-      "affected_component": "Patients / documents",
-      "affected_route": "POST /api/lab/patients/:id/documents, GET /api/lab/documents/:id",
-      "vulnerability_type": "Client-declared content type trusted",
-      "intended_weakness": "The vulnerable route validates only the client-declared content type and keeps the original extension; the document is later served inline with the declared type. Files are stored outside the web root, size-limited, and never executed by the server.",
-      "expected_observation": "A .html file declared as image/png is accepted and returned inline as the declared/inferred type; the secure route rejects it by extension and magic-byte check.",
-      "assessment_method": "Upload harmless synthetic text/HTML files with mismatched declared types to both routes.",
-      "evidence_requirements": "Declared vs actual type, accept/reject status, response Content-Type and Content-Disposition.",
-      "severity_rationale": "Pending assessment. Factors: no server-side execution; browser-side impact only.",
-      "remediation": "Allow-list extensions, verify magic bytes, generate server-side names, serve with Content-Disposition: attachment and X-Content-Type-Options: nosniff.",
-      "remediation_reference": "OWASP File Upload Cheat Sheet",
-      "test_case_ids": [
-        "HMS-UPL-001"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "HMS-V09",
-      "title": "Missing security headers on printable invoice view",
-      "category": "Security Misconfiguration",
-      "cwe": "CWE-693",
-      "owasp_category": "A05:2021 Security Misconfiguration",
-      "affected_component": "Billing / printable invoice",
-      "affected_route": "GET /api/lab/invoices/:id/print",
-      "vulnerability_type": "Missing X-Frame-Options, CSP and X-Content-Type-Options",
-      "intended_weakness": "The designated route omits the headers set globally on every other response.",
-      "expected_observation": "Response lacks X-Frame-Options, Content-Security-Policy and X-Content-Type-Options; /api/invoices/:id responses include them.",
-      "assessment_method": "Passive scan with ZAP; compare headers of the two routes.",
-      "evidence_requirements": "Header names present/absent on each route.",
-      "severity_rationale": "Pending assessment. Factors: clickjacking exposure of a read-only page.",
-      "remediation": "Apply the global security-header middleware to every route; add a header regression test.",
-      "remediation_reference": "OWASP Secure Headers Project",
-      "test_case_ids": [
-        "HMS-CFG-001"
       ],
       "status": "implemented"
     },
@@ -216,69 +47,6 @@
       "status": "implemented"
     },
     {
-      "id": "HMS-V11",
-      "title": "CSRF via state-changing GET request (appointment cancel)",
-      "category": "CSRF",
-      "cwe": "CWE-352",
-      "owasp_category": "A01:2021 Broken Access Control",
-      "affected_component": "Appointments / cancel",
-      "affected_route": "GET /api/lab/appointments/:id/cancel",
-      "vulnerability_type": "State change on safe method, no anti-CSRF token",
-      "intended_weakness": "Cancellation is available through GET and is exempt from the X-CSRF-Token check applied to POST/PUT/PATCH/DELETE.",
-      "expected_observation": "A link/navigation from another local origin cancels an appointment using the victim's Lax session cookie.",
-      "assessment_method": "Issue the GET without a CSRF token and observe the state change; confirm POST /api/appointments/:id/status without a token returns 403.",
-      "evidence_requirements": "Status codes and before/after appointment status.",
-      "severity_rationale": "Pending assessment. Factors: integrity impact on scheduling, requires victim interaction.",
-      "remediation": "Make cancellation POST-only with CSRF token validation and SameSite cookies.",
-      "remediation_reference": "OWASP CSRF Prevention Cheat Sheet",
-      "test_case_ids": [
-        "HMS-CSRF-001"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "HMS-V12",
-      "title": "Path traversal via incomplete filter on lab report download",
-      "category": "Path and Resource Handling",
-      "cwe": "CWE-22",
-      "owasp_category": "A01:2021 Broken Access Control",
-      "affected_component": "Laboratory / report download",
-      "affected_route": "GET /api/lab/reports/download?file=",
-      "vulnerability_type": "Path traversal (non-recursive sanitisation)",
-      "intended_weakness": "The route strips '../' once and joins the result to lab-data/public-docs. A hard sandbox guard confines resolution to the lab-data directory, so only synthetic files in lab-data/restricted-docs are reachable.",
-      "expected_observation": "file=....//restricted-docs/formulary-internal.txt returns the restricted synthetic file; direct references outside lab-data are always rejected.",
-      "assessment_method": "Request an allowed file, then a traversal variant; verify the sandbox guard rejects a path leaving lab-data.",
-      "evidence_requirements": "Requested name, status code, whether restricted synthetic content was returned (marker line only).",
-      "severity_rationale": "Pending assessment. Factors: confined to synthetic lab directory.",
-      "remediation": "Resolve against the base directory, compare path.relative, and use an allow-list of file names.",
-      "remediation_reference": "OWASP Path Traversal",
-      "test_case_ids": [
-        "HMS-PTH-001"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "HMS-V13",
-      "title": "Server-side request forgery in monograph fetch",
-      "category": "SSRF",
-      "cwe": "CWE-918",
-      "owasp_category": "A10:2021 Server-Side Request Forgery",
-      "affected_component": "Pharmacy / drug monograph fetch",
-      "affected_route": "GET /api/lab/integrations/fetch?url=",
-      "vulnerability_type": "SSRF (blocklist bypass)",
-      "intended_weakness": "The server fetches a user-supplied URL and blocks only the literal hostname \"localhost\". Lab containment: the fetcher only ever contacts loopback IP literals, response capped at 4 KB.",
-      "expected_observation": "url=http://localhost:4100/... is rejected, but url=http://127.0.0.1:4100/internal/metadata returns the synthetic internal-service marker.",
-      "assessment_method": "Request the internal URL with several host spellings and compare which are blocked.",
-      "evidence_requirements": "Requested URL, status, whether the marker text was returned.",
-      "severity_rationale": "Pending assessment. Factors: reaches internal-only synthetic service, authenticated precondition, loopback only.",
-      "remediation": "Allow-list of destination hosts, resolve and re-check IPs after DNS, deny private/loopback ranges, no redirects, egress firewall.",
-      "remediation_reference": "OWASP SSRF Prevention Cheat Sheet",
-      "test_case_ids": [
-        "HMS-SSRF-001"
-      ],
-      "status": "implemented"
-    },
-    {
       "id": "HMS-V14",
       "title": "Open redirect on post-login continue link",
       "category": "Open Redirect",
@@ -296,48 +64,6 @@
       "remediation_reference": "OWASP Unvalidated Redirects Cheat Sheet",
       "test_case_ids": [
         "HMS-RED-001"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "HMS-V15",
-      "title": "JWT accepts alg=none",
-      "category": "Authentication",
-      "cwe": "CWE-347",
-      "owasp_category": "A02:2021 Cryptographic Failures",
-      "affected_component": "API tokens",
-      "affected_route": "POST /api/lab/api-token, GET /api/lab/token-admin/summary",
-      "vulnerability_type": "Signature verification bypass",
-      "intended_weakness": "The verifier trusts the token header \"alg\" and skips signature checking when it is \"none\". A forged administrator claim reads a synthetic role summary.",
-      "expected_observation": "A token issued to a low-privilege user is rejected (403); an unsigned token with role=administrator is accepted (200).",
-      "assessment_method": "Decode the issued token, modify claims, set alg to none, replay.",
-      "evidence_requirements": "Token structure (not the raw token), status codes before and after.",
-      "severity_rationale": "Pending assessment. Factors: privilege escalation limited to a read-only summary.",
-      "remediation": "Pin the algorithm server-side, reject \"none\", use a maintained JWT library.",
-      "remediation_reference": "RFC 8725 JWT Best Current Practices",
-      "test_case_ids": [
-        "HMS-JWT-001"
-      ],
-      "status": "implemented"
-    },
-    {
-      "id": "HMS-V16",
-      "title": "Blind / time-based SQL injection in MRN existence check",
-      "category": "Injection",
-      "cwe": "CWE-89",
-      "owasp_category": "A03:2021 Injection",
-      "affected_component": "Patients / MRN lookup",
-      "affected_route": "GET /api/lab/patients/exists?mrn=",
-      "vulnerability_type": "Blind SQL injection (boolean oracle)",
-      "intended_weakness": "mrn is concatenated into the query; only {exists:true|false} is returned and errors are swallowed. Containment: read-only transaction, single statement, 3 s statement timeout.",
-      "expected_observation": "A normal MRN returns true; a tautology returns true for unknown MRNs; a false condition returns false; no data is echoed.",
-      "assessment_method": "Infer data one boolean at a time with conditions such as mrn=SYN-000001' AND substring(...)'.",
-      "evidence_requirements": "Pairs of true/false conditions and responses.",
-      "severity_rationale": "Pending assessment. Factors: slow extraction, read-only, authenticated.",
-      "remediation": "Parameterised queries; generic responses; rate limiting.",
-      "remediation_reference": "OWASP SQL Injection Prevention Cheat Sheet",
-      "test_case_ids": [
-        "HMS-INJ-003"
       ],
       "status": "implemented"
     },
@@ -382,27 +108,78 @@
         "HMS-AC-007"
       ],
       "status": "implemented"
+    }
+  ],
+  "remediated": [
+    {
+      "id": "HMS-V01",
+      "title": "SQL injection in legacy patient search",
+      "cwe": "CWE-89"
+    },
+    {
+      "id": "HMS-V02",
+      "title": "Stored cross-site scripting in patient clinical notes",
+      "cwe": "CWE-79"
+    },
+    {
+      "id": "HMS-V04",
+      "title": "Missing function-level authorization on audit export",
+      "cwe": "CWE-862"
+    },
+    {
+      "id": "HMS-V05",
+      "title": "Mass assignment on profile update",
+      "cwe": "CWE-915"
+    },
+    {
+      "id": "HMS-V06",
+      "title": "Weak password-reset token without attempt limiting",
+      "cwe": "CWE-330"
+    },
+    {
+      "id": "HMS-V07",
+      "title": "Session fixation: session identifier not rotated on login",
+      "cwe": "CWE-384"
+    },
+    {
+      "id": "HMS-V08",
+      "title": "Insufficient file-upload validation for patient documents",
+      "cwe": "CWE-434"
+    },
+    {
+      "id": "HMS-V09",
+      "title": "Missing security headers on printable invoice view",
+      "cwe": "CWE-693"
+    },
+    {
+      "id": "HMS-V11",
+      "title": "CSRF via state-changing GET request (appointment cancel)",
+      "cwe": "CWE-352"
+    },
+    {
+      "id": "HMS-V12",
+      "title": "Path traversal via incomplete filter on lab report download",
+      "cwe": "CWE-22"
+    },
+    {
+      "id": "HMS-V13",
+      "title": "Server-side request forgery in monograph fetch",
+      "cwe": "CWE-918"
+    },
+    {
+      "id": "HMS-V15",
+      "title": "JWT accepts alg=none",
+      "cwe": "CWE-347"
+    },
+    {
+      "id": "HMS-V16",
+      "title": "Blind / time-based SQL injection in MRN existence check",
+      "cwe": "CWE-89"
     },
     {
       "id": "HMS-V19",
       "title": "Unauthenticated debug configuration endpoint",
-      "category": "Information Disclosure",
-      "cwe": "CWE-200",
-      "owasp_category": "A05:2021 Security Misconfiguration",
-      "affected_component": "Diagnostics",
-      "affected_route": "GET /api/lab/debug/config",
-      "vulnerability_type": "Exposed debug endpoint",
-      "intended_weakness": "A diagnostics route without authentication returns runtime details and a list of mounted lab routes. No secrets are included.",
-      "expected_observation": "An anonymous request returns 200 with version, Node version, database kind and route list.",
-      "assessment_method": "Request anonymously.",
-      "evidence_requirements": "Status and the categories of fields disclosed.",
-      "severity_rationale": "Pending assessment. Factors: reconnaissance aid only.",
-      "remediation": "Remove debug routes from builds or require admin authentication and network restriction.",
-      "remediation_reference": "OWASP Testing Guide: Information Gathering",
-      "test_case_ids": [
-        "HMS-INF-002"
-      ],
-      "status": "implemented"
+      "cwe": "CWE-200"
     }
   ]
 }

@@ -1,12 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { patch, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { ApiTokenCard, useLabMode } from '../components/vulnerable/LabTools';
 import { Alert, Button, Card, KV, PageHeader, TextField, errMsg, fieldErrors, useToast } from '../components/ui';
 
 export default function Profile() {
   const { user, refresh } = useAuth(); const toast = useToast();
-  const lab = useLabMode();
   const [p, setP] = useState({ full_name: user?.fullName ?? '', email: user?.email ?? '' });
   const [pw, setPw] = useState({ current_password: '', new_password: '' });
   const [e1, setE1] = useState(''); const [e2, setE2] = useState(''); const [fe, setFe] = useState<Record<string, string>>({}); const [b1, setB1] = useState(false); const [b2, setB2] = useState(false);
@@ -26,7 +24,6 @@ export default function Profile() {
           <TextField label="New password" type="password" autoComplete="new-password" required value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} hint="At least 10 characters" error={fe.new_password} />
           <Button type="submit" loading={b2}>Change password</Button></form></Card>
       </div>
-      {lab && <ApiTokenCard />}
     </div>
   );
 }

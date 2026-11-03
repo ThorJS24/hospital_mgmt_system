@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { get, post, fmtDateTime } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { MedicationLookup, MonographFetch, useLabMode } from '../components/vulnerable/LabTools';
+import { MedicationLookup, useLabMode } from '../components/vulnerable/LabTools';
 import { Alert, Button, DataTable, Modal, PageHeader, SelectField, Spinner, StatusBadge, Tabs, TextField, Toolbar, errMsg, useAsync, useList, useToast, type Column } from '../components/ui';
 
 interface Rx { id: number; status: string; dispensing_status: string; created_at: string; patient: string; mrn: string; doctor: string; item_count: number }
@@ -46,7 +46,7 @@ export default function Pharmacy() {
           <DataTable list={meds} columns={medCols} caption="Medications" />
         </>}
       </div>
-      {lab && <div className="mt-4 grid gap-4 lg:grid-cols-2"><MonographFetch /><MedicationLookup /></div>}
+      {lab && <div className="mt-4 grid gap-4 lg:grid-cols-2"><MedicationLookup /></div>}
       <Detail id={detail} onClose={() => setDetail(null)} onDispense={can('prescriptions.dispense') ? dispense : undefined} />
       <CreateDialog open={create} onClose={() => setCreate(false)} onDone={() => { setCreate(false); rx.reload(); toast('Prescription created'); }} />
     </div>

@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
 import { get, post, fmtDateTime } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { ReportDownload, useLabMode } from '../components/vulnerable/LabTools';
 import { Alert, Button, DataTable, Modal, PageHeader, SelectField, StatusBadge, Tabs, TextField, Toolbar, errMsg, useAsync, useList, useToast, type Column } from '../components/ui';
 
 interface Row { id: number; status: string; requested_at: string; patient: string; mrn: string; test: string; test_code: string; unit: string; reference_range: string; ordering_doctor: string; technician: string | null; result_value: string | null; result_comment: string | null; result_approved: boolean | null }
@@ -12,7 +11,6 @@ export default function Laboratory() {
   const list = useList<Row>('/api/laboratory/requests');
   const [tab, setTab] = useState('requests');
   const [create, setCreate] = useState(false);
-  const lab = useLabMode();
   const [result, setResult] = useState<Row | null>(null);
   const act = async (r: Row, what: 'assign' | 'approve') => {
     try { await post(`/api/laboratory/requests/${r.id}/${what}`, {}); toast(what === 'assign' ? 'Assigned to you' : 'Result approved'); list.reload(); } catch (x) { toast(errMsg(x), 'danger'); }
@@ -45,7 +43,7 @@ export default function Laboratory() {
             </div>)} />
         </>}
         {tab === 'catalogue' && <Catalogue />}
-        {tab === 'docs' && <><Docs />{lab && <div className="mt-4"><ReportDownload /></div>}</>}
+        {tab === 'docs' && <><Docs /></>}
       </div>
       <CreateDialog open={create} onClose={() => setCreate(false)} onDone={() => { setCreate(false); list.reload(); toast('Laboratory request created'); }} />
       <ResultDialog row={result} onClose={() => setResult(null)} onDone={() => { setResult(null); list.reload(); toast('Result recorded'); }} />

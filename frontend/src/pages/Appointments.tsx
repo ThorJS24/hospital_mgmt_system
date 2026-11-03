@@ -2,7 +2,6 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
 import { get, post, patch, fmtDateTime, qs } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { useLabMode } from '../components/vulnerable/LabTools';
 import { Alert, Button, DataTable, EmptyState, Modal, PageHeader, SelectField, StatusBadge, Tabs, TextField, Toolbar, errMsg, fieldErrors, useAsync, useList, useToast, type Column } from '../components/ui';
 
 const STATUSES = ['Scheduled', 'Confirmed', 'Checked in', 'In consultation', 'Completed', 'Cancelled', 'No-show'];
@@ -16,7 +15,6 @@ export default function Appointments() {
   const { can } = useAuth(); const toast = useToast();
   const list = useList<Row>('/api/appointments', 'time', 15);
   const [view, setView] = useState('list');
-  const lab = useLabMode();
   const [create, setCreate] = useState(false);
   const [resched, setResched] = useState<Row | null>(null);
   const depts = useAsync(() => get('/api/departments'), []);
@@ -50,7 +48,6 @@ export default function Appointments() {
             actions={canWrite ? (r) => (
               <div className="flex flex-wrap justify-end gap-1">
                 {['Scheduled', 'Confirmed'].includes(r.status) && <Button variant="ghost" onClick={() => setResched(r)}>Reschedule</Button>}
-                {lab && ['Scheduled', 'Confirmed'].includes(r.status) && <a className="rounded-lg px-2 py-2 text-xs text-primary hover:underline" href={`/api/lab/appointments/${r.id}/cancel`} target="_blank" rel="noreferrer">Quick cancel</a>}
                 {NEXT[r.status].length > 0 && <select aria-label={`Change status for appointment ${r.id}`} className="rounded-md border border-line bg-surface px-2 py-1 text-xs" value="" onChange={(e) => e.target.value && void setStatus(r, e.target.value)}><option value="">Change status…</option>{NEXT[r.status].map((s) => <option key={s}>{s}</option>)}</select>}
               </div>) : undefined} />
         ) : <Schedule filters={list.state.filters} />}

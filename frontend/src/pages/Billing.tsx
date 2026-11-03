@@ -38,7 +38,7 @@ export default function Billing() {
 }
 
 function Detail({ id, onClose }: { id: number | null; onClose: () => void }) {
-  const { can, lab } = useAuth(); const toast = useToast();
+  const { can } = useAuth(); const toast = useToast();
   const { data, loading, error, reload } = useAsync(() => (id ? get(`/api/invoices/${id}`) : Promise.resolve(null)), [id]);
   const [amount, setAmount] = useState(''); const [err, setErr] = useState('');
   const pay = async (e: FormEvent) => {
@@ -63,7 +63,6 @@ function Detail({ id, onClose }: { id: number | null; onClose: () => void }) {
               {data.paid === 0 && <Button type="button" variant="danger" onClick={() => void cancel()}>Cancel invoice</Button>}
             </form>
           )}
-          {lab.mode === 'vulnerable' && <a className="text-sm text-primary hover:underline" target="_blank" rel="noreferrer" href={`/api/lab/invoices/${data.id}/print`}>Open printable view</a>}
         </div>
       )}
     </Modal>

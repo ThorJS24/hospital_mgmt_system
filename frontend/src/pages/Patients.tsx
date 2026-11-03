@@ -4,7 +4,6 @@ import { Plus } from 'lucide-react';
 import { get, post, fmtDate } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Avatar, isChild, sexToGender } from '../components/Avatar';
-import { LegacyPatientSearch, useLabMode } from '../components/vulnerable/LabTools';
 import { Button, DataTable, Modal, PageHeader, SelectField, StatusBadge, TextField, Toolbar, Alert, errMsg, fieldErrors, useAsync, useList, useToast, type Column } from '../components/ui';
 
 interface Row { id: number; mrn: string; first_name: string; last_name: string; dob: string; sex: string; phone: string; status: string; primary_doctor: string | null }
@@ -14,7 +13,6 @@ export default function Patients() {
   const { can } = useAuth();
   const list = useList<Row>('/api/patients', 'name');
   const [open, setOpen] = useState(false);
-  const lab = useLabMode();
   const cols: Column<Row>[] = [
     { key: 'mrn', label: 'MRN', sortKey: 'mrn', className: 'whitespace-nowrap' },
     { key: 'name', label: 'Name', sortKey: 'name', render: (r) => <span className="inline-flex items-center gap-2.5"><Avatar name={`${r.first_name} ${r.last_name}`} gender={sexToGender(r.sex, r.id)} seed={r.id} child={isChild(r.dob)} size="xs" />{r.last_name}, {r.first_name}</span> },
@@ -35,7 +33,6 @@ export default function Patients() {
         </Toolbar>
         <DataTable list={list} columns={cols} caption="Patients" onRowClick={(r) => nav(`/patients/${r.id}`)} empty="No patients match" />
       </div>
-      {lab && can('patients.read_all') && <div className="mt-4"><LegacyPatientSearch /></div>}
       <RegisterDialog open={open} onClose={() => setOpen(false)} onDone={(id) => nav(`/patients/${id}`)} />
     </div>
   );

@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
 import { get, patch, post, put, fmtDateTime } from '../lib/api';
-import { AuditExport, useLabMode } from '../components/vulnerable/LabTools';
 import { Alert, Button, Card, DataTable, Modal, PageHeader, SelectField, StatusBadge, Tabs, TextField, Toolbar, errMsg, fieldErrors, useAsync, useList, useToast, type Column } from '../components/ui';
 
 const ROLES = [['administrator', 'Administrator'], ['doctor', 'Doctor'], ['nurse', 'Nurse'], ['receptionist', 'Receptionist'], ['lab_technician', 'Laboratory Technician'], ['pharmacist', 'Pharmacist'], ['billing_officer', 'Billing Officer']];
@@ -79,14 +78,13 @@ function Config() {
 }
 
 function Audit() {
-  const lab = useLabMode();
   const list = useList<any>('/api/admin/audit', '', 20);
   const cols: Column<any>[] = [
     { key: 'at', label: 'Time', render: (r) => fmtDateTime(r.at), className: 'whitespace-nowrap' }, { key: 'username', label: 'User', render: (r) => r.username ?? 'system' },
     { key: 'action', label: 'Action' }, { key: 'entity', label: 'Entity', render: (r) => `${r.entity} ${r.entity_id}` }, { key: 'detail', label: 'Detail' },
     { key: 'request_id', label: 'Request ID', render: (r) => <code className="text-xs">{String(r.request_id).slice(0, 8)}</code> },
   ];
-  return <div className="space-y-4"><Card title="Activity log"><Toolbar list={list} placeholder="Action, user or entity" /><DataTable list={list} columns={cols} caption="Audit events" /></Card>{lab && <AuditExport />}</div>;
+  return <div className="space-y-4"><Card title="Activity log"><Toolbar list={list} placeholder="Action, user or entity" /><DataTable list={list} columns={cols} caption="Audit events" /></Card></div>;
 }
 
 function Outbox() {

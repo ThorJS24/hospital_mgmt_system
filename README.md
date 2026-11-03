@@ -3,7 +3,7 @@
 > **ACADEMIC SECURITY LAB — SYNTHETIC DATA ONLY — NOT FOR CLINICAL USE.**
 > This application contains deliberately introduced security weaknesses. Run it only on your own machine, bound to `127.0.0.1`. Never deploy or expose it publicly.
 
-MediCore is a realistic, full-stack hospital management system (React + Express + PostgreSQL) built as a target for Web Application Security assessment. It has 19 documented, isolated weaknesses (HMS-V01 … HMS-V19), a role-based permission model, live-updating synthetic data, and an assessment area (findings, evidence, coverage metrics, exports) for the security assessor role.
+MediCore is a realistic, full-stack hospital management system (React + Express + PostgreSQL) built as a target for Web Application Security assessment. It is a hardened build: 14 of the original 19 weaknesses have been remediated, and 5 deliberately remain for assessors to find (HMS-V03, V10, V14, V17, V18). It also has a role-based permission model, live-updating synthetic data, and an assessment area (findings, evidence, coverage metrics, exports) for the security assessor role.
 
 All people, records, SSNs, insurance numbers and card numbers are **fabricated**: SSNs use the never-issued 9xx range, cards are public payment-processor test numbers, emails use `.example.test`.
 
@@ -67,19 +67,20 @@ Password-reset codes are delivered to Administration → Local outbox (no email 
 Environment variables are listed in `.env.example` (`LAB_MODE`, `LAB_VULNS`, `HOST`, `PORT`, `DATABASE_URL`, `LIVE_SIM`, …). With no `DATABASE_URL` the database lives in `./.pglite`.
 
 ## Intended weaknesses
-Nineteen scenarios, each isolated in `backend/src/assessment/vulnerable/` (plus `frontend/src/components/UnsafeNote.tsx`), enabled only with `LAB_MODE=vulnerable` and individually switchable with `LAB_VULNS=HMS-V03,HMS-V11,…`:
+Five scenarios remain, isolated in `backend/src/assessment/vulnerable/` (and the login handler for HMS-V18), enabled only with `LAB_MODE=vulnerable` and individually switchable with `LAB_VULNS=HMS-V03,HMS-V14,…`:
 
-SQL injection · stored XSS · IDOR/BOLA · missing function-level authorization · mass assignment · weak password-reset token · session fixation · file-upload validation · missing security headers · verbose errors · CSRF via GET · path traversal · SSRF · open redirect · JWT `alg:none` · blind/time-based SQL injection · reflected XSS · user enumeration · exposed debug endpoint.
+IDOR/BOLA · verbose errors · open redirect · reflected XSS · user enumeration.
+
+Remediated (code removed or fixed, now covered by security-control test cases): SQL injection (incl. blind), stored XSS, missing function-level authorization, mass assignment, weak password-reset token, session fixation, file-upload validation, missing security headers, CSRF via GET, path traversal, SSRF, JWT `alg:none`, exposed debug endpoint.
 
 The internal manifest (`assessment/manifest/vulnerabilities.json`) describes each one (route, CWE/OWASP category, expected observation, assessment method, remediation). It is intentionally **not** served by the application except to the assessor role. If you are using this repository as an exercise, avoid reading the manifest and the `vulnerable/` directory before your own assessment. A manifest entry is not evidence that a weakness exists in a running build; findings start as *Not Tested* with severity *Pending*.
 
 ## Safety controls
 - Default mode is secure, bound to `127.0.0.1`. Vulnerable mode refuses to start on a non-loopback `HOST` unless `LAB_ALLOW_CONTAINER_BIND=1` (set only by Compose, which publishes on `127.0.0.1`).
 - `/api/lab/*` is mounted only in vulnerable mode.
-- Containment inside the scenarios: SQL scenarios run read-only, single-statement and time-limited; the SSRF client refuses everything except loopback IP literals; uploads are size-limited, stored outside the web root and never executed; path traversal is sandboxed to `lab-data/`.
 - Hospital administrators hold no `assessment.*` permission and cannot create or modify assessor accounts.
 - Reset exists only as a local CLI, refuses non-local DB hosts and `NODE_ENV=production`; there is no HTTP reset endpoint.
-- No outbound HTTP code except the contained SSRF client. Secrets are never logged; evidence is redacted on entry.
+- The application makes no outbound HTTP requests. Secrets are never logged; evidence is redacted on entry.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/SAFETY.md](docs/SAFETY.md).
 

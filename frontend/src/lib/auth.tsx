@@ -5,14 +5,14 @@ export interface User {
   id: number; username: string; fullName: string; email: string; role: string; roleName: string;
   staffId: number | null; departmentId: number | null; permissions: string[];
 }
-interface LabInfo { mode: 'secure' | 'vulnerable'; unsafeNotes: boolean; banner: string }
+interface LabInfo { mode: 'secure' | 'vulnerable'; banner: string }
 interface AuthState {
   user: User | null; lab: LabInfo; loading: boolean; backendDown: boolean;
   login: (u: string, p: string) => Promise<void>; logout: () => Promise<void>; refresh: () => Promise<void>;
   can: (...perms: string[]) => boolean;
 }
 
-const DEFAULT_LAB: LabInfo = { mode: 'secure', unsafeNotes: false, banner: 'ACADEMIC SECURITY LAB — SYNTHETIC DATA ONLY — NOT FOR CLINICAL USE' };
+const DEFAULT_LAB: LabInfo = { mode: 'secure', banner: 'ACADEMIC SECURITY LAB — SYNTHETIC DATA ONLY — NOT FOR CLINICAL USE' };
 const Ctx = createContext<AuthState>(null as unknown as AuthState);
 export const useAuth = () => useContext(Ctx);
 

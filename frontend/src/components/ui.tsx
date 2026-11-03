@@ -192,7 +192,7 @@ export function DataTable<T extends { id: number | string }>({ list, columns, on
 }) {
   const { rows, loading, error, state, total, pageSize } = list;
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  const cell = (c: Column<T>, r: T) => (c.render ? c.render(r) : String((r as any)[c.key] ?? '—'));
+  const cell = (c: Column<T>, r: T) => (c.render ? c.render(r) : String((r as any)[c.key] ?? '-'));
   return (
     <div>
       {error ? <Alert>{error}</Alert> : loading && !rows.length ? <Spinner /> : !rows.length ? <EmptyState title={empty} hint={state.q || Object.values(state.filters).some(Boolean) ? 'Try clearing the search or filters.' : undefined} /> : (
@@ -253,7 +253,7 @@ export function Toolbar({ list, placeholder = 'Search', children }: { list: { st
 }
 
 export const KV = ({ label, children }: { label: string; children: ReactNode }) => (
-  <div><dt className="text-xs font-medium text-muted">{label}</dt><dd className="mt-0.5 break-words">{children ?? '—'}</dd></div>
+  <div><dt className="text-xs font-medium text-muted">{label}</dt><dd className="mt-0.5 break-words">{children ?? '-'}</dd></div>
 );
 
 export function PageHeader({ title, subtitle, actions, image, leading }: { title: string; subtitle?: string; actions?: ReactNode; image?: string; leading?: ReactNode }) {

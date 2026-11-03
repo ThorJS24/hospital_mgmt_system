@@ -86,7 +86,7 @@ function Clinical({ p, reload }: { p: any; reload: () => void }) {
     <div className="grid gap-4 lg:grid-cols-2">
       {err && <div className="lg:col-span-2"><Alert>{err}</Alert></div>}
       <Card title="Allergies">
-        {p.allergies.length ? <ul className="divide-y divide-line">{p.allergies.map((x: any) => <li key={x.id} className="flex items-center justify-between py-1.5"><span>{x.allergen} <span className="text-muted">— {x.reaction || 'no reaction recorded'}</span></span><StatusBadge status={x.severity} /></li>)}</ul> : <EmptyState title="No known allergies recorded" />}
+        {p.allergies.length ? <ul className="divide-y divide-line">{p.allergies.map((x: any) => <li key={x.id} className="flex items-center justify-between py-1.5"><span>{x.allergen} <span className="text-muted">- {x.reaction || 'no reaction recorded'}</span></span><StatusBadge status={x.severity} /></li>)}</ul> : <EmptyState title="No known allergies recorded" />}
         {can('clinical.write') && <form className="mt-3 grid gap-2 border-t border-line pt-3 sm:grid-cols-3" onSubmit={(e) => { e.preventDefault(); void add(`/api/patients/${p.id}/allergies`, a, () => setA({ allergen: '', reaction: '', severity: 'Mild' })); }}>
           <TextField label="Allergen" required value={a.allergen} onChange={(e) => setA({ ...a, allergen: e.target.value })} />
           <TextField label="Reaction" value={a.reaction} onChange={(e) => setA({ ...a, reaction: e.target.value })} />

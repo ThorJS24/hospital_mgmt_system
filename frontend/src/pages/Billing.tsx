@@ -22,7 +22,7 @@ export default function Billing() {
   ];
   return (
     <div>
-      <PageHeader title="Billing" subtitle="Synthetic invoices — no real payment processing" actions={can('billing.write') ? <Button onClick={() => setCreate(true)}><Plus className="h-4 w-4" />New invoice</Button> : undefined} />
+      <PageHeader title="Billing" subtitle="Synthetic invoices - no real payment processing" actions={can('billing.write') ? <Button onClick={() => setCreate(true)}><Plus className="h-4 w-4" />New invoice</Button> : undefined} />
       <div className="card-shadow rounded-xl border border-line bg-surface p-4">
         <Toolbar list={list} placeholder="Invoice no., patient or MRN">
           <SelectField label="Status" value={list.state.filters.status ?? ''} onChange={(e) => list.setFilter('status', e.target.value)}><option value="">All</option>{['Draft', 'Issued', 'Partially paid', 'Paid', 'Cancelled'].map((s) => <option key={s}>{s}</option>)}</SelectField>

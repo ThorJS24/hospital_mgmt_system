@@ -28,7 +28,7 @@ export function startSimulator(db: Db, intervalMs = 7000): () => void {
     const next = { Scheduled: 'Checked in', Confirmed: 'Checked in', 'Checked in': 'In consultation', 'In consultation': 'Completed' }[a.status]!;
     await db.query('UPDATE appointments SET status=$1 WHERE id=$2', [next, a.id]);
     await simAudit(db, 'appointment_status', 'appointment', a.id, next);
-    emitLive('appointment', next === 'Checked in' ? `Patient checked in — ${a.dept}` : next === 'In consultation' ? `Consultation started — ${a.dept}` : `Consultation completed — ${a.dept}`);
+    emitLive('appointment', next === 'Checked in' ? `Patient checked in - ${a.dept}` : next === 'In consultation' ? `Consultation started - ${a.dept}` : `Consultation completed - ${a.dept}`);
   });
 
   // laboratory pipeline
@@ -39,16 +39,16 @@ export function startSimulator(db: Db, intervalMs = 7000): () => void {
     if (l.status === 'Requested') {
       const tech = (await db.query<{ id: number }>("SELECT id FROM staff WHERE staff_code LIKE 'LAB-%' ORDER BY random() LIMIT 1")).rows[0];
       await db.query("UPDATE laboratory_requests SET status='In progress', assigned_tech_id=$1 WHERE id=$2", [tech.id, l.id]);
-      emitLive('lab', `Sample received — ${l.test}`);
+      emitLive('lab', `Sample received - ${l.test}`);
     } else if (l.status === 'In progress') {
       const value = (1 + Math.random() * 12).toFixed(1);
       await db.query('INSERT INTO laboratory_results(request_id,value,comment,entered_at) VALUES ($1,$2,$3,$4) ON CONFLICT (request_id) DO NOTHING', [l.id, value, 'SYNTHETIC RESULT - not for clinical use', naiveNow()]);
       await db.query("UPDATE laboratory_requests SET status='Resulted' WHERE id=$1", [l.id]);
-      emitLive('lab', `Result entered — ${l.test}`);
+      emitLive('lab', `Result entered - ${l.test}`);
     } else {
       await db.query('UPDATE laboratory_results SET approved=true WHERE request_id=$1', [l.id]);
       await db.query("UPDATE laboratory_requests SET status='Approved' WHERE id=$1", [l.id]);
-      emitLive('lab', `Result approved — ${l.test}`);
+      emitLive('lab', `Result approved - ${l.test}`);
     }
     await simAudit(db, 'lab_progress', 'laboratory_request', l.id);
   });
@@ -59,7 +59,7 @@ export function startSimulator(db: Db, intervalMs = 7000): () => void {
         SELECT (SELECT id FROM patients ORDER BY random() LIMIT 1), t.id, (SELECT id FROM staff WHERE staff_code LIKE 'DOC-%' ORDER BY random() LIMIT 1), $1::timestamp FROM laboratory_tests t ORDER BY random() LIMIT 1
         RETURNING id, (SELECT name FROM laboratory_tests WHERE id=test_id) AS test`, [naiveNow()])).rows[0];
     await simAudit(db, 'lab_request', 'laboratory_request', r.id);
-    emitLive('lab', `New laboratory order — ${r.test}`);
+    emitLive('lab', `New laboratory order - ${r.test}`);
   });
 
   // payment received
@@ -74,7 +74,7 @@ export function startSimulator(db: Db, intervalMs = 7000): () => void {
     await db.query('INSERT INTO payments(invoice_id,amount,method,paid_at) VALUES ($1,$2,$3,$4)', [i.id, amount, 'Card (synthetic)', naiveNow()]);
     await db.query('UPDATE invoices SET status=$1 WHERE id=$2', [amount >= i.balance - 0.005 ? 'Paid' : 'Partially paid', i.id]);
     await simAudit(db, 'payment_record', 'invoice', i.id, `amount=${amount}`);
-    emitLive('billing', `Payment received — ${i.invoice_no}`);
+    emitLive('billing', `Payment received - ${i.invoice_no}`);
   });
 
   // new registration (rare)
@@ -98,14 +98,14 @@ export function startSimulator(db: Db, intervalMs = 7000): () => void {
     if (active && (free < 6 || Math.random() < 0.5)) {
       await db.query("UPDATE admissions SET status='Discharged', discharged_at=$1 WHERE id=$2", [naiveNow(), active.id]);
       await simAudit(db, 'admission_discharge', 'admission', active.id);
-      emitLive('admission', `Patient discharged — ${active.ward}`);
+      emitLive('admission', `Patient discharged - ${active.ward}`);
     } else {
       const adm = (await db.query<{ id: number; ward: string }>(`INSERT INTO admissions(patient_id,bed_id,doctor_id,admitted_at,reason)
         SELECT p.id, b.id, (SELECT id FROM staff WHERE staff_code LIKE 'DOC-%' ORDER BY random() LIMIT 1), $1::timestamp, 'Observation'
           FROM (SELECT id FROM patients WHERE id NOT IN (SELECT patient_id FROM admissions WHERE status='Admitted') ORDER BY random() LIMIT 1) p,
                (SELECT id FROM beds WHERE id NOT IN (SELECT bed_id FROM admissions WHERE status='Admitted') ORDER BY random() LIMIT 1) b
         RETURNING id, (SELECT w.name FROM beds bb JOIN wards w ON w.id=bb.ward_id WHERE bb.id=bed_id) AS ward`, [naiveNow()])).rows[0];
-      if (adm) { await simAudit(db, 'admission_create', 'admission', adm.id); emitLive('admission', `Patient admitted — ${adm.ward}`); }
+      if (adm) { await simAudit(db, 'admission_create', 'admission', adm.id); emitLive('admission', `Patient admitted - ${adm.ward}`); }
     }
   });
 

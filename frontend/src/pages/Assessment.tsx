@@ -15,7 +15,7 @@ export default function Assessment() {
   return (
     <div>
       <PageHeader title="Security assessment" subtitle="Assessment register for the MediCore academic lab. Metrics are calculated from stored records." />
-      <Alert tone="warn">Registered weaknesses are <strong>intended</strong> and unverified until you record evidence or an explicit decision. Evidence may contain sensitive information — credentials, cookies and tokens are redacted on entry, but always review before sharing.</Alert>
+      <Alert tone="warn">Registered weaknesses are <strong>intended</strong> and unverified until you record evidence or an explicit decision. Evidence may contain sensitive information - credentials, cookies and tokens are redacted on entry, but always review before sharing.</Alert>
       <div className="mt-3"><Tabs tabs={[{ id: 'overview', label: 'Overview' }, { id: 'tests', label: 'Test cases' }, { id: 'findings', label: 'Findings' }, { id: 'evidence', label: 'Evidence' }, { id: 'reports', label: 'Reports & export' }]} value={tab} onChange={setTab} /></div>
       <div className="mt-4">{tab === 'overview' ? <Overview /> : tab === 'tests' ? <TestCases /> : tab === 'findings' ? <Findings /> : tab === 'evidence' ? <Evidence /> : <Reports />}</div>
     </div>
@@ -65,7 +65,7 @@ function TestCases() {
       <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only-live">Test cases</caption><thead className="text-xs uppercase text-muted"><tr><th className="px-2 py-1">ID</th><th>Name</th><th>Kind</th><th>Account</th><th>Finding</th><th>Latest result</th><th /></tr></thead>
         <tbody>{data.data.map((t: any) => { const last = t.results?.[0]; return (
           <tr key={t.id} className="border-t border-line align-top"><td className="px-2 py-1.5 whitespace-nowrap font-medium">{t.id}</td><td>{t.name}<p className="text-xs text-muted">{t.objective}</p></td>
-            <td><StatusBadge status={t.kind === 'expected-vulnerability' ? 'Expected vulnerability' : 'Security control'} tone={t.kind === 'expected-vulnerability' ? 'warn' : 'info'} /></td><td>{t.test_account}</td><td>{t.finding_id ?? '—'}</td>
+            <td><StatusBadge status={t.kind === 'expected-vulnerability' ? 'Expected vulnerability' : 'Security control'} tone={t.kind === 'expected-vulnerability' ? 'warn' : 'info'} /></td><td>{t.test_account}</td><td>{t.finding_id ?? '-'}</td>
             <td>{last ? <StatusBadge status={last.status} /> : <span className="text-muted">Not executed</span>}</td><td className="text-right"><Button variant="secondary" onClick={() => setRec(t)}>Record result</Button></td></tr>); })}</tbody></table></div>
       <ResultDialog tc={rec} onClose={() => setRec(null)} onDone={() => { setRec(null); reload(); toast('Result recorded'); }} />
     </Card>
@@ -160,7 +160,7 @@ function FindingDialog({ id, onClose }: { id: string | null; onClose: () => void
     } catch (x) { setErr(errMsg(x)); }
   };
   return (
-    <Modal open={id !== null} onClose={onClose} title={f ? `${f.id} — ${f.title}` : 'Finding'} wide>
+    <Modal open={id !== null} onClose={onClose} title={f ? `${f.id} - ${f.title}` : 'Finding'} wide>
       {loading && !f ? <Spinner /> : error ? <Alert>{error}</Alert> : f && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2"><StatusBadge status={f.status} /><StatusBadge status={f.severity ?? 'Pending'} tone={f.severity ? undefined : 'neutral'} /><span className="text-muted">{f.category} · {f.origin} · {f.affected_route}</span></div>
@@ -175,8 +175,8 @@ function FindingDialog({ id, onClose }: { id: string | null; onClose: () => void
           <Tabs tabs={[{ id: 'details', label: 'Assessment' }, { id: 'evidence', label: `Evidence (${f.evidence.length})` }, { id: 'manifest', label: 'Manifest' }, { id: 'history', label: 'History' }]} value={tab} onChange={setTab} />
           {tab === 'details' && <Details f={f} onSaved={() => { toast('Finding saved'); reload(); }} />}
           {tab === 'evidence' && <EvidenceTab f={f} reload={reload} />}
-          {tab === 'manifest' && (f.manifest ? <dl className="grid gap-3 sm:grid-cols-2"><KV label="CWE">{f.manifest.cwe}</KV><KV label="OWASP">{f.manifest.owasp_category}</KV><KV label="Component">{f.manifest.affected_component}</KV><KV label="Route">{f.manifest.affected_route}</KV><KV label="Intended weakness">{f.manifest.intended_weakness}</KV><KV label="Expected observation">{f.manifest.expected_observation}</KV><KV label="Assessment method">{f.manifest.assessment_method}</KV><KV label="Evidence requirements">{f.manifest.evidence_requirements}</KV><KV label="Severity rationale">{f.manifest.severity_rationale}</KV><KV label="Remediation">{f.manifest.remediation}</KV><KV label="Test cases">{f.test_cases.map((t: any) => t.id).join(', ') || '—'}</KV></dl> : <EmptyState title="Not part of the intended manifest" />)}
-          {tab === 'history' && (f.history.length ? <ul className="divide-y divide-line">{f.history.map((h: any) => <li key={h.id} className="py-1.5"><strong>{h.from_status ?? '—'} → {h.to_status}</strong> <span className="text-muted">by {h.username ?? 'unknown'} · {fmtDateTime(h.at)}</span>{h.note && <p>{h.note}</p>}</li>)}</ul> : <EmptyState title="No status changes yet" />)}
+          {tab === 'manifest' && (f.manifest ? <dl className="grid gap-3 sm:grid-cols-2"><KV label="CWE">{f.manifest.cwe}</KV><KV label="OWASP">{f.manifest.owasp_category}</KV><KV label="Component">{f.manifest.affected_component}</KV><KV label="Route">{f.manifest.affected_route}</KV><KV label="Intended weakness">{f.manifest.intended_weakness}</KV><KV label="Expected observation">{f.manifest.expected_observation}</KV><KV label="Assessment method">{f.manifest.assessment_method}</KV><KV label="Evidence requirements">{f.manifest.evidence_requirements}</KV><KV label="Severity rationale">{f.manifest.severity_rationale}</KV><KV label="Remediation">{f.manifest.remediation}</KV><KV label="Test cases">{f.test_cases.map((t: any) => t.id).join(', ') || '-'}</KV></dl> : <EmptyState title="Not part of the intended manifest" />)}
+          {tab === 'history' && (f.history.length ? <ul className="divide-y divide-line">{f.history.map((h: any) => <li key={h.id} className="py-1.5"><strong>{h.from_status ?? '-'} → {h.to_status}</strong> <span className="text-muted">by {h.username ?? 'unknown'} · {fmtDateTime(h.at)}</span>{h.note && <p>{h.note}</p>}</li>)}</ul> : <EmptyState title="No status changes yet" />)}
         </div>
       )}
     </Modal>
@@ -241,7 +241,7 @@ function EvidenceTab({ f, reload }: { f: any; reload: () => void }) {
           <TextField label="Route" value={v.route} onChange={set('route')} />
         </div>
         <div className="grid gap-3 sm:grid-cols-2"><TextArea label="Sanitised request metadata" value={v.request_meta} onChange={set('request_meta')} /><TextArea label="Sanitised response metadata" value={v.response_meta} onChange={set('response_meta')} /></div>
-        <div className="grid gap-3 sm:grid-cols-2"><TextField label="Screenshot reference" value={v.screenshot_ref} onChange={set('screenshot_ref')} hint="File name or note — not uploaded" /><div className="flex flex-col gap-1"><label htmlFor="ev-file" className="text-xs font-medium text-muted">Evidence file (txt, json, md, log, csv, png; max 1 MB)</label><input id="ev-file" ref={file} type="file" accept=".txt,.json,.md,.log,.csv,.png" className="text-sm" /></div></div>
+        <div className="grid gap-3 sm:grid-cols-2"><TextField label="Screenshot reference" value={v.screenshot_ref} onChange={set('screenshot_ref')} hint="File name or note - not uploaded" /><div className="flex flex-col gap-1"><label htmlFor="ev-file" className="text-xs font-medium text-muted">Evidence file (txt, json, md, log, csv, png; max 1 MB)</label><input id="ev-file" ref={file} type="file" accept=".txt,.json,.md,.log,.csv,.png" className="text-sm" /></div></div>
         <TextArea label="Notes" value={v.notes} onChange={set('notes')} />
         <Button type="submit" loading={busy}>Save evidence</Button>
       </form>
@@ -256,7 +256,7 @@ function Evidence() {
   return (
     <Card title="Evidence register">
       <Alert tone="warn">{data.warning}</Alert>
-      {data.data.length === 0 ? <EmptyState title="No evidence recorded yet" /> : <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only-live">Evidence</caption><thead className="text-xs uppercase text-muted"><tr><th className="px-2 py-1">ID</th><th>Finding</th><th>Type</th><th>Route</th><th>Status</th><th>Collected</th><th>SHA-256</th></tr></thead><tbody>{data.data.map((e: any) => <tr key={e.id} className="border-t border-line"><td className="px-2 py-1.5">{e.id}</td><td>{e.finding_id}</td><td>{e.evidence_type}</td><td>{e.http_method} {e.route}</td><td>{e.http_status ?? '—'}</td><td>{fmtDateTime(e.collected_at)}</td><td className="max-w-40 truncate" title={e.sha256 ?? ''}>{e.sha256 ? e.sha256.slice(0, 16) + '…' : '—'}</td></tr>)}</tbody></table></div>}
+      {data.data.length === 0 ? <EmptyState title="No evidence recorded yet" /> : <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only-live">Evidence</caption><thead className="text-xs uppercase text-muted"><tr><th className="px-2 py-1">ID</th><th>Finding</th><th>Type</th><th>Route</th><th>Status</th><th>Collected</th><th>SHA-256</th></tr></thead><tbody>{data.data.map((e: any) => <tr key={e.id} className="border-t border-line"><td className="px-2 py-1.5">{e.id}</td><td>{e.finding_id}</td><td>{e.evidence_type}</td><td>{e.http_method} {e.route}</td><td>{e.http_status ?? '-'}</td><td>{fmtDateTime(e.collected_at)}</td><td className="max-w-40 truncate" title={e.sha256 ?? ''}>{e.sha256 ? e.sha256.slice(0, 16) + '…' : '-'}</td></tr>)}</tbody></table></div>}
     </Card>
   );
 }

@@ -20,8 +20,8 @@ export default function Laboratory() {
     { key: 'patient', label: 'Patient', render: (r) => <>{r.patient} <span className="text-muted">({r.mrn})</span></> },
     { key: 'test', label: 'Test', render: (r) => `${r.test_code} · ${r.test}` },
     { key: 'ordering_doctor', label: 'Ordered by' },
-    { key: 'technician', label: 'Technician', render: (r) => r.technician ?? '—' },
-    { key: 'result', label: 'Result', render: (r) => (r.result_value ? <span>{r.result_value} {r.unit} <span className="text-xs text-muted">{r.result_approved ? '(approved)' : '(unapproved)'}</span></span> : '—') },
+    { key: 'technician', label: 'Technician', render: (r) => r.technician ?? '-' },
+    { key: 'result', label: 'Result', render: (r) => (r.result_value ? <span>{r.result_value} {r.unit} <span className="text-xs text-muted">{r.result_approved ? '(approved)' : '(unapproved)'}</span></span> : '-') },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'requested_at', label: 'Requested', render: (r) => fmtDateTime(r.requested_at) },
   ];
@@ -105,7 +105,7 @@ function ResultDialog({ row, onClose, onDone }: { row: Row | null; onClose: () =
   return (
     <Modal open={!!row} onClose={onClose} title="Enter synthetic result">
       <form onSubmit={submit} className="space-y-3" noValidate>
-        {row && <p className="text-muted">{row.patient} — {row.test} (reference {row.reference_range} {row.unit})</p>}
+        {row && <p className="text-muted">{row.patient} - {row.test} (reference {row.reference_range} {row.unit})</p>}
         {err && <Alert>{err}</Alert>}
         <TextField label={`Value${row?.unit ? ` (${row.unit})` : ''}`} required value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} />
         <TextField label="Comment" value={f.comment} onChange={(e) => setF({ ...f, comment: e.target.value })} hint="Results are synthetic; mention nothing clinical." />

@@ -64,7 +64,7 @@ function RegisterDialog({ open, onClose, onDone }: { open: boolean; onClose: () 
         <TextField label="Phone" value={f.phone} onChange={set('phone')} error={fe.phone} />
         <TextField label="Email" type="email" value={f.email} onChange={set('email')} error={fe.email} />
         <div className="sm:col-span-2"><TextField label="Address" value={f.address} onChange={set('address')} error={fe.address} /></div>
-        <div className="sm:col-span-2"><SelectField label="Primary doctor" value={f.primary_doctor_id} onChange={set('primary_doctor_id')}><option value="">Unassigned</option>{(docs.data?.data ?? []).map((d: any) => <option key={d.id} value={d.id}>{d.full_name} — {d.department}</option>)}</SelectField></div>
+        <div className="sm:col-span-2"><SelectField label="Primary doctor" value={f.primary_doctor_id} onChange={set('primary_doctor_id')}><option value="">Unassigned</option>{(docs.data?.data ?? []).map((d: any) => <option key={d.id} value={d.id}>{d.full_name} - {d.department}</option>)}</SelectField></div>
         <div className="flex justify-end gap-2 sm:col-span-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" loading={busy}>Register</Button></div>
       </form>
     </Modal>

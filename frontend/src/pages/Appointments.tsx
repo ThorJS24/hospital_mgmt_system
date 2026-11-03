@@ -76,7 +76,7 @@ function Schedule({ filters }: { filters: Record<string, string> }) {
           return (
             <section key={d.toISOString()} className="min-h-24 rounded-md border border-line p-2" aria-label={d.toDateString()}>
               <h3 className="mb-1 text-xs font-semibold text-muted">{d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}</h3>
-              {items.length === 0 ? <p className="text-xs text-muted">—</p> : <ul className="space-y-1">{items.map((a: Row) => <li key={a.id} className="rounded bg-surface2 p-1.5 text-xs"><strong>{new Date(a.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong> {a.patient}<br /><span className="text-muted">{a.doctor}</span><div className="mt-0.5"><StatusBadge status={a.status} /></div></li>)}</ul>}
+              {items.length === 0 ? <p className="text-xs text-muted">-</p> : <ul className="space-y-1">{items.map((a: Row) => <li key={a.id} className="rounded bg-surface2 p-1.5 text-xs"><strong>{new Date(a.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong> {a.patient}<br /><span className="text-muted">{a.doctor}</span><div className="mt-0.5"><StatusBadge status={a.status} /></div></li>)}</ul>}
             </section>
           );
         })}
@@ -104,7 +104,7 @@ function CreateDialog({ open, onClose, onDone, docs }: { open: boolean; onClose:
         {err && <div className="sm:col-span-2"><Alert>{err}</Alert></div>}
         <TextField label="Find patient" value={pq} onChange={(e) => setPq(e.target.value)} hint="Type at least 2 letters of a name or MRN" />
         <SelectField label="Patient" required value={f.patient_id} onChange={set('patient_id')} error={fe.patient_id}><option value="">Select…</option>{(pats.data?.data ?? []).map((p: any) => <option key={p.id} value={p.id}>{p.last_name}, {p.first_name} ({p.mrn})</option>)}</SelectField>
-        <SelectField label="Doctor" required value={f.doctor_id} onChange={set('doctor_id')} error={fe.doctor_id}><option value="">Select…</option>{docs.map((d) => <option key={d.id} value={d.id}>{d.full_name} — {d.department}</option>)}</SelectField>
+        <SelectField label="Doctor" required value={f.doctor_id} onChange={set('doctor_id')} error={fe.doctor_id}><option value="">Select…</option>{docs.map((d) => <option key={d.id} value={d.id}>{d.full_name} - {d.department}</option>)}</SelectField>
         <TextField label="Duration (minutes)" type="number" min={5} max={240} value={f.duration_min} onChange={set('duration_min')} error={fe.duration_min} />
         <TextField label="Date" type="date" required value={f.date} onChange={set('date')} error={fe.scheduled_at} />
         <TextField label="Time" type="time" required value={f.time} onChange={set('time')} />

@@ -35,9 +35,9 @@ export const qs = (o: Record<string, unknown>) => {
   return s ? `?${s}` : '';
 };
 
-export const money = (n: number | null | undefined) => (n == null ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n));
-export const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
-export const fmtDateTime = (s?: string | null) => (s ? new Date(s).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
+export const money = (n: number | null | undefined) => (n == null ? '-' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n));
+export const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '-');
+export const fmtDateTime = (s?: string | null) => (s ? new Date(s).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-');
 export const toBase64 = (buf: ArrayBuffer) => {
   let s = '';
   const b = new Uint8Array(buf);

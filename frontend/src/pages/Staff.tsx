@@ -24,7 +24,7 @@ export default function Staff() {
   ];
   return (
     <div>
-      <PageHeader image="/img/hospital/h3.jpg" title="Staff directory" subtitle="Fictional staff — not real medical professionals" actions={can('staff.manage') ? <Button onClick={() => setForm('new')}><Plus className="h-4 w-4" />Add staff</Button> : undefined} />
+      <PageHeader image="/img/hospital/h3.jpg" title="Staff directory" subtitle="Fictional staff - not real medical professionals" actions={can('staff.manage') ? <Button onClick={() => setForm('new')}><Plus className="h-4 w-4" />Add staff</Button> : undefined} />
       <div className="card-shadow rounded-xl border border-line bg-surface p-4">
         <Toolbar list={list} placeholder="Name, code or role">
           <SelectField label="Department" value={list.state.filters.department_id ?? ''} onChange={(e) => list.setFilter('department_id', e.target.value)}><option value="">All</option>{(depts.data?.data ?? []).map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}</SelectField>

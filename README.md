@@ -1,6 +1,6 @@
-# MediCore HMS — intentionally vulnerable hospital management system
+# MediCore HMS - intentionally vulnerable hospital management system
 
-> **ACADEMIC SECURITY LAB — SYNTHETIC DATA ONLY — NOT FOR CLINICAL USE.**
+> **ACADEMIC SECURITY LAB - SYNTHETIC DATA ONLY - NOT FOR CLINICAL USE.**
 > This application contains deliberately introduced security weaknesses. Run it only on your own machine, bound to `127.0.0.1`. Never deploy or expose it publicly.
 
 MediCore is a realistic, full-stack hospital management system (React + Express + PostgreSQL) built as a target for Web Application Security assessment. It is a hardened build: 14 of the original 19 weaknesses have been remediated, and 5 deliberately remain for assessors to find (HMS-V03, V10, V14, V17, V18). It also has a role-based permission model, live-updating synthetic data, and an assessment area (findings, evidence, coverage metrics, exports) for the security assessor role.

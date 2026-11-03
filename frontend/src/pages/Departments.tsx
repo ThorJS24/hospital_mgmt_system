@@ -17,7 +17,7 @@ export default function Departments() {
           {data.data.map((d: any) => (
             <Card key={d.id} title={d.name} actions={can('departments.manage') && <Button variant="ghost" onClick={() => setForm(d)}>Edit</Button>}>
               <p className="text-muted">{d.description}</p>
-              <p className="mt-2 text-xs"><strong>Services:</strong> {d.services || '—'}</p>
+              <p className="mt-2 text-xs"><strong>Services:</strong> {d.services || '-'}</p>
               <p className="mt-2 text-xs text-muted">{d.staff_count} staff · {d.appointments_today} appointments today</p>
               <Button variant="secondary" className="mt-3" onClick={() => setSel(d.id)}>View details</Button>
             </Card>

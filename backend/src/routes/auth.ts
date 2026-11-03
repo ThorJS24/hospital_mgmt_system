@@ -21,7 +21,7 @@ export function authRoutes({ db, cfg }: Ctx) {
       authenticated: !!req.user,
       user: req.user ? publicUser(req.user) : null,
       csrfToken: req.sess.csrf,
-      lab: { mode: cfg.labMode, banner: 'ACADEMIC SECURITY LAB — SYNTHETIC DATA ONLY — NOT FOR CLINICAL USE' },
+      lab: { mode: cfg.labMode, banner: 'ACADEMIC SECURITY LAB - SYNTHETIC DATA ONLY - NOT FOR CLINICAL USE' },
     });
   });
 

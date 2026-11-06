@@ -1,10 +1,11 @@
 import { useRef, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Upload } from 'lucide-react';
 import { get, patch, post, money, fmtDate, fmtDateTime, toBase64 } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Avatar, isChild, sexToGender } from '../components/Avatar';
 import { ClinicalNote } from '../components/UnsafeNote';
+import { VitalsTrend } from '../components/VitalsTrend';
 import { Alert, Button, Card, EmptyState, KV, PageHeader, SelectField, Spinner, StatusBadge, Tabs, TextArea, TextField, errMsg, fieldErrors, useAsync, useToast } from '../components/ui';
 
 export default function PatientDetail() {
@@ -19,7 +20,7 @@ export default function PatientDetail() {
   const tabs = [
     { id: 'demographics', label: 'Demographics' },
     ...(p.appointments ? [{ id: 'appointments', label: 'Appointments' }] : []),
-    ...(p.history ? [{ id: 'clinical', label: 'History & allergies' }, { id: 'vitals', label: 'Vitals' }, { id: 'procedures', label: 'Procedures' }] : []),
+    ...(p.history ? [{ id: 'clinical', label: 'History & allergies' }, { id: 'vitals', label: 'Vitals' }, { id: 'consultations', label: 'Consultations' }, { id: 'procedures', label: 'Procedures' }] : []),
     ...(p.invoices ? [{ id: 'billing', label: 'Billing' }] : []),
     ...(p.documents ? [{ id: 'documents', label: 'Documents' }] : []),
   ];
@@ -40,7 +41,8 @@ export default function PatientDetail() {
         ))}
         {tab === 'appointments' && <Card title="Appointments">{p.appointments.length ? <Rows head={['When', 'Doctor', 'Department', 'Reason', 'Status']} rows={p.appointments.map((a: any) => [fmtDateTime(a.scheduled_at), a.doctor, a.department, a.reason, <StatusBadge key="s" status={a.status} />])} /> : <EmptyState title="No appointments" />}</Card>}
         {tab === 'clinical' && <Clinical p={p} reload={reload} />}
-        {tab === 'vitals' && <Vitals rows={p.vitals} />}
+        {tab === 'vitals' && <VitalsTrend patientId={p.id} canRecord={can('vitals.write')} />}
+        {tab === 'consultations' && <PatientConsultations patientId={p.id} />}
         {tab === 'procedures' && <Card title="Procedures">{p.procedures.length ? <Rows head={['Date', 'Code', 'Procedure', 'Performed by', 'Cost', 'Outcome']} rows={p.procedures.map((x: any) => [fmtDate(x.performed_on), x.code, x.name, x.doctor, money(x.cost), <StatusBadge key="o" status={x.outcome === 'Successful' ? 'Completed' : 'Pending'} tone={x.outcome === 'Successful' ? 'ok' : 'warn'} />])} /> : <EmptyState title="No procedures recorded" />}</Card>}
         {tab === 'billing' && <Card title="Invoices">{p.invoices.length ? <Rows head={['Invoice', 'Issued', 'Total', 'Paid', 'Status']} rows={p.invoices.map((i: any) => [<Link key="l" className="text-primary hover:underline" to={`/billing?q=${i.invoice_no}`}>{i.invoice_no}</Link>, fmtDate(i.issued_on), money(i.total), money(i.paid), <StatusBadge key="s" status={i.status} />])} /> : <EmptyState title="No invoices" />}</Card>}
         {tab === 'documents' && <Documents p={p} reload={reload} />}
@@ -128,14 +130,19 @@ function Documents({ p, reload }: { p: any; reload: () => void }) {
   );
 }
 
-function Vitals({ rows }: { rows: any[] }) {
-  if (!rows.length) return <Card title="Vitals"><EmptyState title="No vitals recorded" /></Card>;
-  const latest = rows[0];
-  const Tile = ({ label, value, unit }: { label: string; value: string | number; unit: string }) => <div className="rounded-lg border border-line p-3"><p className="text-xs text-muted">{label}</p><p className="text-xl font-semibold">{value}<span className="ml-1 text-sm font-normal text-muted">{unit}</span></p></div>;
+function PatientConsultations({ patientId }: { patientId: number }) {
+  const { can } = useAuth();
+  const navigate = useNavigate();
+  const toast = useToast();
+  const q = useAsync(() => get(`/api/consultations?patient_id=${patientId}&pageSize=50`), [patientId]);
+  const start = async () => {
+    try { const r = await post('/api/consultations', { patient_id: patientId }); navigate(`/consultations/${r.id}`); } catch (x) { toast(errMsg(x), 'danger'); }
+  };
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5"><Tile label="Blood pressure" value={`${latest.systolic}/${latest.diastolic}`} unit="mmHg" /><Tile label="Heart rate" value={latest.heart_rate} unit="bpm" /><Tile label="Temperature" value={latest.temperature_c} unit="°C" /><Tile label="SpO₂" value={latest.spo2} unit="%" /><Tile label="Weight" value={latest.weight_kg} unit="kg" /></div>
-      <Card title="Vitals history"><Rows head={['Recorded', 'BP', 'HR', 'Temp', 'SpO₂', 'Weight']} rows={rows.map((v) => [fmtDateTime(v.recorded_at), `${v.systolic}/${v.diastolic}`, v.heart_rate, `${v.temperature_c} °C`, `${v.spo2}%`, `${v.weight_kg} kg`])} /></Card>
-    </div>
+    <Card title="Consultations" actions={can('consultations.write') ? <Button onClick={() => void start()}>Start consultation</Button> : undefined}>
+      {q.error ? <Alert>{q.error}</Alert> : q.loading && !q.data ? <Spinner /> : (q.data?.data ?? []).length
+        ? <Rows head={['Started', 'Doctor', 'Primary diagnosis', 'Status', '']} rows={q.data.data.map((c: any) => [fmtDateTime(c.created_at), c.doctor, c.primary_diagnosis ?? '-', <StatusBadge key="s" status={c.status} tone={c.status === 'Signed' ? 'ok' : 'warn'} />, <Link key="l" className="text-primary hover:underline" to={`/consultations/${c.id}`}>Open</Link>])} />
+        : <EmptyState title="No consultations yet" />}
+    </Card>
   );
 }

@@ -10,7 +10,7 @@ const AVAIL = ['Available', 'In Surgery', 'On Leave', 'Off Duty'];
 
 export default function Staff() {
   const { can } = useAuth(); const toast = useToast();
-  const list = useList<Row>('/api/staff', 'name');
+  const list = useList<Row>('/api/staff', 'name', 15, { urlQuery: true });
   const depts = useAsync(() => get('/api/departments'), []);
   const [sel, setSel] = useState<number | null>(null);
   const [form, setForm] = useState<Row | 'new' | null>(null);

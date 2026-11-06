@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Ctx } from '../middleware/context.js';
 import { audit, requirePermission } from '../middleware/context.js';
 import { HttpError, intParam, parse } from '../utils/http.js';
+import { notifyBedChange } from '../services/notifications.js';
 
 const isUniqueViolation = (e: any) => e?.code === '23505' || /unique|duplicate/i.test(String(e?.message));
 
@@ -46,6 +47,7 @@ export function inpatientRoutes({ db }: Ctx) {
         return (await t.query('INSERT INTO admissions(patient_id,bed_id,doctor_id,admitted_at,reason) VALUES ($1,$2,$3,now(),$4) RETURNING id', [b.patient_id, b.bed_id, b.doctor_id, b.reason])).rows[0].id;
       });
       await audit(db, req, 'admission_create', 'admission', id);
+      await notifyBedChange(db, id, 'admitted');
       res.status(201).json({ id });
     } catch (e) {
       if (isUniqueViolation(e)) throw new HttpError(409, 'Bed or patient is already part of an active admission');
@@ -60,6 +62,7 @@ export function inpatientRoutes({ db }: Ctx) {
     if (cur.status !== 'Admitted') throw new HttpError(409, 'Patient is already discharged');
     await db.query("UPDATE admissions SET status='Discharged', discharged_at=now() WHERE id=$1", [id]);
     await audit(db, req, 'admission_discharge', 'admission', id);
+    await notifyBedChange(db, id, 'discharged');
     res.json({ ok: true });
   });
 
@@ -79,6 +82,7 @@ export function inpatientRoutes({ db }: Ctx) {
       throw e;
     }
     await audit(db, req, 'admission_transfer', 'admission', id);
+    await notifyBedChange(db, id, 'transferred');
     res.json({ ok: true });
   });
 

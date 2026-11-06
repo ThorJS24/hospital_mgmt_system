@@ -76,3 +76,6 @@ table thead th { background: color-mix(in srgb, var(--surface-2) 70%, transparen
 input, select, textarea { transition: border-color .15s, box-shadow .15s; }
 input:focus, select:focus, textarea:focus { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
 .hero { background: linear-gradient(160deg, #0b1f33ee 0%, #0e3a52cc 55%, #0e7490aa 130%), url('/img/hospital/h5.jpg') center / cover no-repeat; }
+
+/* scroll containers must contain absolutely positioned descendants (such as .sr-only-live) so they cannot widen the page */
+.overflow-x-auto { position: relative; }

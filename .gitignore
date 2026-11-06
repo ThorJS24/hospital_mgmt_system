@@ -15,14 +15,7 @@ assessment/evidence/files/
 assessment/reports/out/
 lab-data/uploads/
 
-# local verification tooling and artefacts (not part of the repository)
-e2e/
-playwright.config.ts
-backend/tests/
-backend/vitest.config.ts
-frontend/src/**/*.test.ts
-**/*.test.ts
-**/*.spec.ts
+# local tooling and artefacts (tests, e2e specs and their configs ARE tracked and run in CI)
 coverage/
 .vitest-cache/
 *.tmp.*

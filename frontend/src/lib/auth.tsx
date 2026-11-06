@@ -3,12 +3,13 @@ import { get, post, setCsrf } from './api';
 
 export interface User {
   id: number; username: string; fullName: string; email: string; role: string; roleName: string;
-  staffId: number | null; departmentId: number | null; permissions: string[];
+  staffId: number | null; departmentId: number | null; patientId: number | null; totpEnabled: boolean; permissions: string[];
 }
 interface LabInfo { mode: 'secure' | 'vulnerable'; banner: string }
 interface AuthState {
   user: User | null; lab: LabInfo; loading: boolean; backendDown: boolean;
-  login: (u: string, p: string) => Promise<void>; logout: () => Promise<void>; refresh: () => Promise<void>;
+  login: (u: string, p: string) => Promise<{ twoFactorRequired: boolean; challenge?: string }>; verifyTwoFactor: (challenge: string, code: string) => Promise<void>;
+  logout: () => Promise<void>; refresh: () => Promise<void>;
   can: (...perms: string[]) => boolean;
 }
 
@@ -33,6 +34,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user, lab, loading, backendDown, refresh,
     login: async (username, password) => {
       const r = await post('/api/auth/login', { username, password });
+      if (r.twoFactorRequired) return { twoFactorRequired: true, challenge: r.challenge as string };
+      setCsrf(r.csrfToken); setUser(r.user);
+      return { twoFactorRequired: false };
+    },
+    verifyTwoFactor: async (challenge, code) => {
+      const r = await post('/api/auth/login/2fa', { challenge, code });
       setCsrf(r.csrfToken); setUser(r.user);
     },
     logout: async () => { await post('/api/auth/logout'); await refresh(); },

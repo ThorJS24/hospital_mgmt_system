@@ -1,12 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, CircleDashed, Info, Loader2, X, XCircle, ArrowUp, ArrowDown, Inbox } from 'lucide-react';
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, CircleDashed, Info, Loader2, X, XCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import { ApiError, get, qs } from '../lib/api';
 import { useLiveTick } from '../lib/live';
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ');
 
 // ---------- buttons / cards ----------
-export function Button({ variant = 'primary', loading, className, children, disabled, ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost'; loading?: boolean }) {
+export function Button({ variant = 'primary', loading, className, children, disabled, ...p }: ComponentProps<'button'> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost'; loading?: boolean }) {
   const v = {
     primary: 'bg-primary text-primaryfg hover:brightness-110',
     secondary: 'bg-surface text-ink border border-line shadow-none hover:bg-surface2',
@@ -84,8 +84,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 export const Spinner = ({ label = 'Loading' }: { label?: string }) => (
   <div role="status" className="flex items-center justify-center gap-2 py-10 text-muted"><Loader2 className="h-5 w-5 animate-spin" aria-hidden />{label}…</div>
 );
-export const EmptyState = ({ title, hint }: { title: string; hint?: string }) => (
-  <div className="flex flex-col items-center gap-1 py-10 text-center text-muted"><Inbox className="h-8 w-8" aria-hidden /><p className="font-medium text-ink">{title}</p>{hint && <p>{hint}</p>}</div>
+/** Friendly inline illustration (decorative): a clipboard with a magnifier, drawn with currentColor so it follows the theme. */
+const EmptyIllustration = () => (
+  <svg viewBox="0 0 120 96" className="h-24 w-28 text-primary" role="presentation" aria-hidden focusable="false">
+    <ellipse cx="60" cy="88" rx="38" ry="5" fill="currentColor" opacity=".08" />
+    <rect x="26" y="10" width="56" height="70" rx="7" fill="currentColor" opacity=".08" stroke="currentColor" strokeWidth="2" />
+    <rect x="42" y="5" width="24" height="12" rx="4" fill="var(--surface, #fff)" stroke="currentColor" strokeWidth="2" />
+    <path d="M36 34h36M36 46h26M36 58h18" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity=".45" />
+    <circle cx="80" cy="64" r="14" fill="var(--surface, #fff)" stroke="currentColor" strokeWidth="3" />
+    <path d="m90 74 11 11" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+    <path d="M74 64h12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" opacity=".6" />
+  </svg>
+);
+export const EmptyState = ({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) => (
+  <div className="flex flex-col items-center gap-1 py-8 text-center text-muted"><EmptyIllustration /><p className="mt-1 font-medium text-ink">{title}</p>{hint && <p className="max-w-sm text-sm">{hint}</p>}{action && <div className="mt-3">{action}</div>}</div>
 );
 
 // ---------- forms ----------
@@ -169,9 +181,10 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]) {
 }
 
 export interface ListState { page: number; q: string; sort: string; dir: 'asc' | 'desc'; filters: Record<string, string> }
-export function useList<T>(url: string, initialSort = '', pageSize = 15) {
-  const [s, setS] = useState<ListState>({ page: 1, q: '', sort: initialSort, dir: 'asc', filters: {} });
-  const [debouncedQ, setDebouncedQ] = useState('');
+export function useList<T>(url: string, initialSort = '', pageSize = 15, opts: { urlQuery?: boolean } = {}) {
+  const initialQ = opts.urlQuery ? (new URLSearchParams(window.location.search).get('q') ?? '').slice(0, 100) : '';
+  const [s, setS] = useState<ListState>({ page: 1, q: initialQ, sort: initialSort, dir: 'asc', filters: {} });
+  const [debouncedQ, setDebouncedQ] = useState(initialQ);
   useEffect(() => { const t = setTimeout(() => setDebouncedQ(s.q), 250); return () => clearTimeout(t); }, [s.q]);
   const query = qs({ page: s.page, pageSize, q: debouncedQ, sort: s.sort, dir: s.dir, ...s.filters });
   const tick = useLiveTick();
@@ -223,7 +236,7 @@ export function DataTable<T extends { id: number | string }>({ list, columns, on
           <ul className="space-y-2 md:hidden">
             {rows.map((r) => (
               <li key={r.id} className="rounded-md border border-line p-3" onClick={() => onRowClick?.(r)}>
-                <dl className="grid grid-cols-[7rem_1fr] gap-x-2 gap-y-1 text-sm">
+                <dl className="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-2 gap-y-1 text-sm">
                   {columns.map((c) => <div key={c.key} className="contents"><dt className="text-muted">{c.label}</dt><dd className="break-words">{cell(c, r)}</dd></div>)}
                 </dl>
                 {actions && <div className="mt-2 flex justify-end" onClick={(e) => e.stopPropagation()}>{actions(r)}</div>}
@@ -281,7 +294,7 @@ export function StatCard({ label, value, sub, icon: Icon, tone = 'primary' }: { 
   const t = { primary: 'bg-primary/12 text-primary', ok: 'bg-ok/15 text-ok', warn: 'bg-warn/15 text-warn', info: 'bg-info/15 text-info', danger: 'bg-danger/15 text-danger' }[tone];
   return (
     <div className="card-shadow flex items-start justify-between gap-3 rounded-xl border border-line bg-surface p-4">
-      <div><p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p><p className="mt-1.5 text-3xl font-semibold tracking-tight">{value}</p>{sub && <p className="mt-0.5 text-xs text-muted">{sub}</p>}</div>
+      <div className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-muted">{label}</p><p className="mt-1.5 break-words text-3xl font-semibold tracking-tight">{value}</p>{sub && <p className="mt-0.5 break-words text-xs text-muted">{sub}</p>}</div>
       <span className={cx('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', t)}><Icon className="h-5 w-5" aria-hidden /></span>
     </div>
   );

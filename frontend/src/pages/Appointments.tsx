@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { get, post, patch, fmtDateTime, qs } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -13,6 +14,7 @@ interface Row { id: number; scheduled_at: string; duration_min: number; status: 
 
 export default function Appointments() {
   const { can } = useAuth(); const toast = useToast();
+  const navigate = useNavigate();
   const list = useList<Row>('/api/appointments', 'time', 15);
   const [view, setView] = useState('list');
   const [create, setCreate] = useState(false);
@@ -23,6 +25,9 @@ export default function Appointments() {
 
   const setStatus = async (r: Row, status: string) => {
     try { await post(`/api/appointments/${r.id}/status`, { status }); toast(`Appointment marked ${status}`); list.reload(); } catch (x) { toast(errMsg(x), 'danger'); }
+  };
+  const startConsultation = async (r: Row) => {
+    try { const c = await post('/api/consultations', { patient_id: r.patient_id, appointment_id: r.id }); navigate(`/consultations/${c.id}`); } catch (x) { toast(errMsg(x), 'danger'); }
   };
   const cols: Column<Row>[] = [
     { key: 'time', label: 'When', sortKey: 'time', render: (r) => fmtDateTime(r.scheduled_at), className: 'whitespace-nowrap' },
@@ -47,6 +52,7 @@ export default function Appointments() {
           <DataTable list={list} columns={cols} caption="Appointments" empty="No appointments match"
             actions={canWrite ? (r) => (
               <div className="flex flex-wrap justify-end gap-1">
+                {can('consultations.write') && ['Scheduled', 'Confirmed', 'Checked in', 'In consultation'].includes(r.status) && <Button variant="secondary" onClick={() => void startConsultation(r)}>{r.status === 'In consultation' ? 'Open consultation' : 'Start consultation'}</Button>}
                 {['Scheduled', 'Confirmed'].includes(r.status) && <Button variant="ghost" onClick={() => setResched(r)}>Reschedule</Button>}
                 {NEXT[r.status].length > 0 && <select aria-label={`Change status for appointment ${r.id}`} className="rounded-md border border-line bg-surface px-2 py-1 text-xs" value="" onChange={(e) => e.target.value && void setStatus(r, e.target.value)}><option value="">Change status…</option>{NEXT[r.status].map((s) => <option key={s}>{s}</option>)}</select>}
               </div>) : undefined} />

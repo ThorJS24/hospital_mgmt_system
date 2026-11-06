@@ -17,7 +17,8 @@ export function LiveProvider({ children }: { children: ReactNode }) {
   const last = useRef(0);
 
   useEffect(() => {
-    if (!user) { setEvents([]); setConnected(false); return; }
+    // patients have no operational feed (the server refuses it), so do not open a stream that would reconnect forever
+    if (!user || user.permissions.includes('portal.access')) { setEvents([]); setConnected(false); return; }
     let es: EventSource | null = null;
     let alive = true;
     get('/api/live/recent').then((r) => alive && setEvents(r.data)).catch(() => {});

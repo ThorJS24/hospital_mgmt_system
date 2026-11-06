@@ -1,33 +1,39 @@
-import { useState, type FormEvent } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import { get, post, fmtDateTime } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { MedicationLookup, useLabMode } from '../components/vulnerable/LabTools';
-import { Alert, Button, DataTable, Modal, PageHeader, SelectField, Spinner, StatusBadge, Tabs, TextField, Toolbar, errMsg, useAsync, useList, useToast, type Column } from '../components/ui';
+import { PatientPicker } from '../components/PatientPicker';
+import { PrescribeForm } from '../components/PrescribeForm';
+import { Alert, Button, DataTable, Modal, PageHeader, SelectField, Spinner, StatusBadge, Tabs, Toolbar, errMsg, useAsync, useList, useToast, type Column } from '../components/ui';
 
-interface Rx { id: number; status: string; dispensing_status: string; created_at: string; patient: string; mrn: string; doctor: string; item_count: number }
-interface Med { id: number; code: string; name: string; form: string; strength: string; stock: number }
+interface Rx { id: number; status: string; dispensing_status: string; created_at: string; patient: string; mrn: string; doctor: string; item_count: number; refills_allowed: number; refills_used: number }
+interface Med { id: number; code: string; name: string; form: string; strength: string; stock: number; drug_class?: string }
 
 export default function Pharmacy() {
   const { can } = useAuth(); const toast = useToast();
-  const [tab, setTab] = useState('rx');
+  const urlQ = new URLSearchParams(window.location.search).get('q');
+  const [tab, setTab] = useState(urlQ ? 'meds' : 'rx');
   const rx = useList<Rx>('/api/pharmacy/prescriptions');
-  const meds = useList<Med>('/api/pharmacy/medications');
+  const meds = useList<Med>('/api/pharmacy/medications', '', 15, { urlQuery: true });
   const [detail, setDetail] = useState<number | null>(null);
   const [create, setCreate] = useState(false);
   const lab = useLabMode();
-  const dispense = async (id: number) => { try { await post(`/api/pharmacy/prescriptions/${id}/dispense`); toast('Prescription dispensed'); rx.reload(); meds.reload(); setDetail(null); } catch (x) { toast(errMsg(x), 'danger'); } };
+  const act = async (id: number, what: 'dispense' | 'refill') => {
+    try { await post(`/api/pharmacy/prescriptions/${id}/${what}`); toast(what === 'dispense' ? 'Prescription dispensed' : 'Refill dispensed'); rx.reload(); meds.reload(); setDetail(null); } catch (x) { toast(errMsg(x), 'danger'); }
+  };
   const rxCols: Column<Rx>[] = [
     { key: 'id', label: 'Rx', render: (r) => `RX-${String(r.id).padStart(4, '0')}` },
     { key: 'patient', label: 'Patient', render: (r) => <>{r.patient} <span className="text-muted">({r.mrn})</span></> },
     { key: 'doctor', label: 'Prescriber' },
     { key: 'item_count', label: 'Items' },
+    { key: 'refills', label: 'Refills', render: (r) => (r.refills_allowed ? `${r.refills_allowed - r.refills_used} of ${r.refills_allowed} left` : '-') },
     { key: 'created_at', label: 'Issued', render: (r) => fmtDateTime(r.created_at) },
     { key: 'status', label: 'Status', render: (r) => <StatusBadge status={r.status} /> },
     { key: 'dispensing_status', label: 'Dispensing', render: (r) => <StatusBadge status={r.dispensing_status} /> },
   ];
   const medCols: Column<Med>[] = [
-    { key: 'code', label: 'Code' }, { key: 'name', label: 'Medication' }, { key: 'form', label: 'Form' }, { key: 'strength', label: 'Strength' },
+    { key: 'code', label: 'Code' }, { key: 'name', label: 'Medication' }, { key: 'form', label: 'Form' }, { key: 'strength', label: 'Strength' }, { key: 'drug_class', label: 'Class', render: (m) => m.drug_class || '-' },
     { key: 'stock', label: 'Stock', render: (m) => <span>{m.stock}{m.stock < 100 && <span className="ml-1 text-xs text-warn">(low)</span>}</span> },
   ];
   return (
@@ -47,22 +53,28 @@ export default function Pharmacy() {
         </>}
       </div>
       {lab && <div className="mt-4 grid gap-4 lg:grid-cols-2"><MedicationLookup /></div>}
-      <Detail id={detail} onClose={() => setDetail(null)} onDispense={can('prescriptions.dispense') ? dispense : undefined} />
+      <Detail id={detail} onClose={() => setDetail(null)} onAct={(id, what) => void act(id, what)} canDispense={can('prescriptions.dispense')} canRefill={can('prescriptions.refill')} />
       <CreateDialog open={create} onClose={() => setCreate(false)} onDone={() => { setCreate(false); rx.reload(); toast('Prescription created'); }} />
     </div>
   );
 }
 
-function Detail({ id, onClose, onDispense }: { id: number | null; onClose: () => void; onDispense?: (id: number) => void }) {
+function Detail({ id, onClose, onAct, canDispense, canRefill }: { id: number | null; onClose: () => void; onAct: (id: number, what: 'dispense' | 'refill') => void; canDispense: boolean; canRefill: boolean }) {
   const { data, loading, error } = useAsync(() => (id ? get(`/api/pharmacy/prescriptions/${id}`) : Promise.resolve(null)), [id]);
+  const left = data ? data.refills_allowed - data.refills_used : 0;
   return (
     <Modal open={id !== null} onClose={onClose} title={id ? `Prescription RX-${String(id).padStart(4, '0')}` : ''} wide>
       {loading ? <Spinner /> : error ? <Alert>{error}</Alert> : data && (
         <div className="space-y-3">
           <p>{data.patient} ({data.mrn}) · prescribed by {data.doctor} · <StatusBadge status={data.dispensing_status} /></p>
-          <table className="w-full text-left text-sm"><thead className="text-xs uppercase text-muted"><tr><th className="py-1">Medication</th><th>Quantity</th><th>Dosage</th></tr></thead><tbody>{data.items.map((i: any) => <tr key={i.id} className="border-t border-line"><td className="py-1.5">{i.medication} {i.strength} ({i.form})</td><td>{i.quantity}</td><td>{i.dosage}</td></tr>)}</tbody></table>
+          <table className="w-full text-left text-sm"><caption className="sr-only-live">Items</caption><thead className="text-xs uppercase text-muted"><tr><th className="py-1">Medication</th><th>Quantity</th><th>Dosage</th></tr></thead><tbody>{data.items.map((i: any) => <tr key={i.id} className="border-t border-line"><td className="py-1.5">{i.medication} {i.strength}</td><td>{i.quantity}</td><td>{i.dosage}{i.units_per_dose && i.doses_per_day ? <span className="block text-xs text-muted">{i.units_per_dose} unit(s) x {i.doses_per_day}/day</span> : null}</td></tr>)}</tbody></table>
+          {data.refills_allowed > 0 && <p className="text-sm">Refills: <strong>{left}</strong> of {data.refills_allowed} remaining{data.last_dispensed_at && <span className="text-muted"> (last dispensed {fmtDateTime(data.last_dispensed_at)})</span>}</p>}
+          {data.override_reason && <Alert tone="warn">Prescribed despite blocking safety findings. Documented reason: {data.override_reason}</Alert>}
           <p className="text-xs text-muted">{data.notice}</p>
-          {onDispense && data.status === 'Active' && data.dispensing_status !== 'Dispensed' && <div className="flex justify-end"><Button onClick={() => onDispense(data.id)}>Dispense</Button></div>}
+          <div className="flex justify-end gap-2">
+            {canDispense && data.status === 'Active' && data.dispensing_status !== 'Dispensed' && <Button onClick={() => onAct(data.id, 'dispense')}>Dispense</Button>}
+            {canRefill && data.status === 'Active' && data.dispensing_status === 'Dispensed' && left > 0 && <Button onClick={() => onAct(data.id, 'refill')}>Dispense refill ({left} left)</Button>}
+          </div>
         </div>
       )}
     </Modal>
@@ -71,41 +83,19 @@ function Detail({ id, onClose, onDispense }: { id: number | null; onClose: () =>
 
 function CreateDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const { user } = useAuth();
-  const [patient, setPatient] = useState(''); const [pq, setPq] = useState(''); const [doctor, setDoctor] = useState('');
-  const [items, setItems] = useState([{ medication_id: '', quantity: '10', dosage: '' }]);
-  const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
-  const pats = useAsync(() => (pq.length >= 2 ? get(`/api/patients?q=${encodeURIComponent(pq)}&pageSize=8`) : Promise.resolve({ data: [] })), [pq]);
-  const meds = useAsync(() => get('/api/pharmacy/medications?pageSize=100'), []);
+  const [patient, setPatient] = useState(''); const [doctor, setDoctor] = useState('');
   const docs = useAsync(() => get('/api/staff?kind=doctor&pageSize=50'), []);
-  const upd = (i: number, k: string, v: string) => setItems(items.map((it, j) => (j === i ? { ...it, [k]: v } : it)));
-  const submit = async (e: FormEvent) => {
-    e.preventDefault(); setBusy(true); setErr('');
-    try {
-      await post('/api/pharmacy/prescriptions', { patient_id: Number(patient), ...(user?.role !== 'doctor' && { doctor_id: Number(doctor) }), items: items.map((i) => ({ medication_id: Number(i.medication_id), quantity: Number(i.quantity), dosage: i.dosage })) });
-      setItems([{ medication_id: '', quantity: '10', dosage: '' }]); onDone();
-    } catch (x) { setErr(errMsg(x)); }
-    setBusy(false);
-  };
   return (
     <Modal open={open} onClose={onClose} title="New prescription" wide>
-      <form onSubmit={submit} className="space-y-3" noValidate>
-        {err && <Alert>{err}</Alert>}
-        <div className="grid gap-3 sm:grid-cols-2">
-          <TextField label="Find patient" value={pq} onChange={(e) => setPq(e.target.value)} hint="Type at least 2 letters" />
-          <SelectField label="Patient" required value={patient} onChange={(e) => setPatient(e.target.value)}><option value="">Select…</option>{(pats.data?.data ?? []).map((p: any) => <option key={p.id} value={p.id}>{p.last_name}, {p.first_name} ({p.mrn})</option>)}</SelectField>
-          {user?.role !== 'doctor' && <SelectField label="Prescribing doctor" required value={doctor} onChange={(e) => setDoctor(e.target.value)}><option value="">Select…</option>{(docs.data?.data ?? []).map((d: any) => <option key={d.id} value={d.id}>{d.full_name}</option>)}</SelectField>}
-        </div>
-        {items.map((it, i) => (
-          <fieldset key={i} className="grid items-end gap-2 rounded-md border border-line p-2 sm:grid-cols-[2fr_6rem_2fr_auto]"><legend className="px-1 text-xs text-muted">Item {i + 1}</legend>
-            <SelectField label="Medication" required value={it.medication_id} onChange={(e) => upd(i, 'medication_id', e.target.value)}><option value="">Select…</option>{(meds.data?.data ?? []).map((m: Med) => <option key={m.id} value={m.id}>{m.name} {m.strength}</option>)}</SelectField>
-            <TextField label="Quantity" type="number" min={1} required value={it.quantity} onChange={(e) => upd(i, 'quantity', e.target.value)} />
-            <TextField label="Dosage instructions" required value={it.dosage} onChange={(e) => upd(i, 'dosage', e.target.value)} />
-            {items.length > 1 && <Button type="button" variant="ghost" aria-label={`Remove item ${i + 1}`} onClick={() => setItems(items.filter((_, j) => j !== i))}><Trash2 className="h-4 w-4" /></Button>}
-          </fieldset>
-        ))}
-        <Button type="button" variant="secondary" onClick={() => setItems([...items, { medication_id: '', quantity: '10', dosage: '' }])}>Add item</Button>
-        <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" loading={busy}>Create prescription</Button></div>
-      </form>
+      <div className="space-y-3">
+        <PatientPicker value={patient} onChange={setPatient} />
+        {user?.role !== 'doctor' && <SelectField label="Prescribing doctor" required value={doctor} onChange={(e) => setDoctor(e.target.value)}><option value="">Select...</option>{(docs.data?.data ?? []).map((d: any) => <option key={d.id} value={d.id}>{d.full_name}</option>)}</SelectField>}
+        <PrescribeForm patientId={patient ? Number(patient) : null} submitLabel="Create prescription"
+          onSubmit={(p) => post('/api/pharmacy/prescriptions', { patient_id: Number(patient), ...(user?.role !== 'doctor' && { doctor_id: Number(doctor) }), ...p })}
+          onDone={() => onDone()} />
+        <p className="text-xs text-muted">Allergies, interactions with current medicines and maximum daily doses are checked before anything is saved.</p>
+      </div>
     </Modal>
   );
 }
+

@@ -1,6 +1,7 @@
 import type { Db } from '../db/index.js';
 import { emitLive } from './live.js';
 import { log } from '../utils/logger.js';
+import { checkCriticalLab, notifyBedChange, notifyRoles } from './notifications.js';
 
 /**
  * Background activity simulator: makes the synthetic hospital "breathe" so dashboards, queues and
@@ -44,6 +45,7 @@ export function startSimulator(db: Db, intervalMs = 7000): () => void {
       const value = (1 + Math.random() * 12).toFixed(1);
       await db.query('INSERT INTO laboratory_results(request_id,value,comment,entered_at) VALUES ($1,$2,$3,$4) ON CONFLICT (request_id) DO NOTHING', [l.id, value, 'SYNTHETIC RESULT - not for clinical use', naiveNow()]);
       await db.query("UPDATE laboratory_requests SET status='Resulted' WHERE id=$1", [l.id]);
+      await checkCriticalLab(db, l.id);
       emitLive('lab', `Result entered - ${l.test}`);
     } else {
       await db.query('UPDATE laboratory_results SET approved=true WHERE request_id=$1', [l.id]);
@@ -98,6 +100,7 @@ export function startSimulator(db: Db, intervalMs = 7000): () => void {
     if (active && (free < 6 || Math.random() < 0.5)) {
       await db.query("UPDATE admissions SET status='Discharged', discharged_at=$1 WHERE id=$2", [naiveNow(), active.id]);
       await simAudit(db, 'admission_discharge', 'admission', active.id);
+      await notifyBedChange(db, active.id, 'discharged');
       emitLive('admission', `Patient discharged - ${active.ward}`);
     } else {
       const adm = (await db.query<{ id: number; ward: string }>(`INSERT INTO admissions(patient_id,bed_id,doctor_id,admitted_at,reason)
@@ -105,8 +108,42 @@ export function startSimulator(db: Db, intervalMs = 7000): () => void {
           FROM (SELECT id FROM patients WHERE id NOT IN (SELECT patient_id FROM admissions WHERE status='Admitted') ORDER BY random() LIMIT 1) p,
                (SELECT id FROM beds WHERE id NOT IN (SELECT bed_id FROM admissions WHERE status='Admitted') ORDER BY random() LIMIT 1) b
         RETURNING id, (SELECT w.name FROM beds bb JOIN wards w ON w.id=bb.ward_id WHERE bb.id=bed_id) AS ward`, [naiveNow()])).rows[0];
-      if (adm) { await simAudit(db, 'admission_create', 'admission', adm.id); emitLive('admission', `Patient admitted - ${adm.ward}`); }
+      if (adm) { await simAudit(db, 'admission_create', 'admission', adm.id); await notifyBedChange(db, adm.id, 'admitted'); emitLive('admission', `Patient admitted - ${adm.ward}`); }
     }
+  });
+
+  // emergency arrivals (rare), capped so the queue stays readable
+  actions.push(async () => {
+    if (Math.random() > 0.3) return;
+    const queued = (await db.query<{ n: number }>("SELECT count(*)::int AS n FROM triage_entries WHERE status='Waiting'")).rows[0].n;
+    if (queued >= 8) return;
+    const p = (await db.query<{ id: number }>(`SELECT id FROM patients WHERE status='Active' AND id NOT IN (SELECT patient_id FROM triage_entries WHERE status IN ('Waiting','In treatment'))
+        AND id NOT IN (SELECT patient_id FROM admissions WHERE status='Admitted') ORDER BY random() LIMIT 1`)).rows[0];
+    if (!p) return;
+    const complaints: [string, number][] = [['Chest pain radiating to the left arm', 2], ['Shortness of breath', 2], ['Laceration to the forearm', 4], ['Ankle injury after a fall', 4], ['Persistent fever and cough', 3], ['Abdominal pain', 3], ['Sore throat', 5], ['Minor burn to the hand', 4], ['Severe allergic reaction', 1], ['Headache and dizziness', 3]];
+    const [complaint, esi] = complaints[rnd(complaints.length)];
+    const t = (await db.query<{ id: number }>('INSERT INTO triage_entries(patient_id,complaint,esi_level) VALUES ($1,$2,$3) RETURNING id', [p.id, complaint, esi])).rows[0];
+    await simAudit(db, 'triage_register', 'triage', t.id, `esi=${esi}`);
+    if (esi === 1) await notifyRoles(db, ['doctor', 'nurse', 'administrator'], { kind: 'triage_resus', severity: 'critical', title: 'ESI 1 arrival: immediate resuscitation', body: complaint, link: '/triage', dedupeKey: `triage:${t.id}` });
+    emitLive('triage', `New arrival in the emergency queue (ESI ${esi})`);
+  });
+
+  // emergency queue progress: treat the highest-priority waiting patient, finish patients already in treatment
+  actions.push(async () => {
+    const inTx = (await db.query<{ id: number }>("SELECT id FROM triage_entries WHERE status='In treatment' AND started_at < now() - interval '45 seconds' ORDER BY random() LIMIT 1")).rows[0];
+    if (inTx) {
+      await db.query("UPDATE triage_entries SET status='Completed', completed_at=now() WHERE id=$1", [inTx.id]);
+      await simAudit(db, 'triage_complete', 'triage', inTx.id);
+      emitLive('triage', 'Emergency patient discharged from the queue');
+      return;
+    }
+    const next = (await db.query<{ id: number }>("SELECT id FROM triage_entries WHERE status='Waiting' ORDER BY esi_level, arrived_at LIMIT 1")).rows[0];
+    if (!next) return;
+    const doc = (await db.query<{ id: number }>("SELECT s.id FROM staff s JOIN departments d ON d.id=s.department_id WHERE s.staff_code LIKE 'DOC-%' AND d.name='Emergency' ORDER BY random() LIMIT 1")).rows[0];
+    if (!doc) return;
+    await db.query("UPDATE triage_entries SET status='In treatment', started_at=now(), assigned_doctor_id=$2 WHERE id=$1 AND status='Waiting'", [next.id, doc.id]);
+    await simAudit(db, 'triage_start', 'triage', next.id);
+    emitLive('triage', 'Emergency treatment started');
   });
 
   const timer = setInterval(() => {

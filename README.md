@@ -9,8 +9,25 @@ All people, records, SSNs, insurance numbers and card numbers are **fabricated**
 
 ## Features
 - **Hospital modules:** dashboard, patients (demographics, insurance & identifiers, history, allergies, vitals, procedures, documents, billing), appointments (list + weekly schedule, conflict detection, status workflow), admissions & beds, staff, departments, laboratory, pharmacy, billing, operational reports, administration, profile & password reset.
-- **Eight roles** with an explicit permission matrix (`backend/src/services/permissions.ts`) enforced by the backend, plus object-level scoping for doctors and nurses.
+- **Nine roles** (eight staff roles and a patient role) with an explicit permission matrix (`backend/src/services/permissions.ts`) enforced by the backend, plus object-level scoping for doctors and nurses.
 - **Realistic live data:** ~120 patients, per-doctor day-sheets, 48 beds, ~140 lab requests, prescriptions, invoices. A background simulator (disable with `LIVE_SIM=0`) checks patients in, progresses lab samples, records payments and admits/discharges patients; the UI updates over server-sent events (`/api/live`, anonymised messages only).
+- **Clinical workflow:**
+  - *Consultations:* a one-page workspace for SOAP notes, ICD-10 diagnosis search, lab orders, prescriptions and a sign-off that locks the record, started from a patient or a booked appointment.
+  - *Prescribing safety:* allergy checks (with class cross-reactivity), drug-drug interactions, maximum daily dose, duplicates and stock. Severe findings block the prescription unless the prescriber documents an audited override. Dosing fields and refills are supported.
+  - *Medication round (MAR):* doctors schedule doses for inpatients, nurses record each one as given, held, refused or missed with a timestamp, and overdue doses are highlighted.
+  - *Vitals trends:* per-patient charts with adult and paediatric reference ranges and abnormal readings marked; critical readings alert the primary doctor.
+  - *Discharge:* a discharge summary with medications and instructions, one-step follow-up booking with the attending doctor, and a printable PDF.
+  - *Emergency triage:* a priority queue ordered by Emergency Severity Index, wait-time targets, and immediate alerts for ESI 1 arrivals.
+- **Operations:**
+  - *Notifications:* an in-app bell with alerts for critical lab values, bed changes, overdue invoices, low stock, leave requests and more, private to each user.
+  - *Global search* (`Ctrl+K`): patients (care-team scoped), invoices, staff and medicines, filtered by what the user may open.
+  - *Rosters and leave:* weekly shifts, a leave workflow with approval, and bookable appointment slots derived from shifts, leave and existing bookings.
+  - *Inventory:* reorder levels, expiry tracking, a stock ledger, receiving and write-offs, and suppliers.
+  - *Billing extras:* refunds against specific payments, insurance claims with a four-eyes approval rule, payment history and PDF invoices.
+  - *Reports:* bed occupancy, wait times, collections, aging and claims, with CSV (formula-injection safe) and PDF export.
+- **Patient portal:** a `patient` role that can see only its own appointments, approved results, prescriptions and bills, update contact details and book or cancel appointments online. Appointment reminders and confirmations are written to a local outbox (nothing is sent).
+- **Account security:** TOTP two-step verification with recovery codes (RFC 6238, no extra dependencies), an active-sessions page with "sign out other devices", password strength hints and server-side password rules.
+- **Platform:** onboarding tour, keyboard shortcuts (`?` for the list), illustrated empty states, English, Spanish and Hindi interface text, a generated OpenAPI reference (`/api/docs`, administrators), and CI.
 - **UI:** clinical design system, light/dark theme, responsive tables, accessible dialogs/forms, portraits and hospital photography (bundled locally).
 - **Assessment area (assessor only):** test-case register, findings with status workflow, evidence with SHA-256 and secret redaction, separate coverage metrics, CSV/JSON/HTML export.
 
@@ -40,7 +57,7 @@ npm run docker:secure    # secure mode
 npm run docker:lab       # vulnerable mode (adds docker-compose.lab.yml)
 npm run docker:reset     # rebuild the synthetic dataset
 ```
-All published ports bind to `127.0.0.1`; the database publishes no port. (`docker compose config` validates; the images have not been built in the development environment.)
+All published ports bind to `127.0.0.1`; the database publishes no port. The images are built, started and smoke-tested against PostgreSQL in CI (secure and lab modes).
 
 ## Test accounts (development only)
 | Username | Password | Role |
@@ -54,6 +71,7 @@ All published ports bind to `127.0.0.1`; the database publishes no port. (`docke
 | pharmacist.rossi | LabPharm#2026 | Pharmacist |
 | billing.nakamura | LabBill#2026 | Billing officer |
 | assessor.vance | LabAssess#2026 | Security assessor |
+| patient.portal | LabPatient#2026 | Patient (portal account for the patient SYN-000005) |
 
 Password-reset codes are delivered to Administration → Local outbox (no email is sent). Five failed logins lock an account for 10 minutes.
 
@@ -63,6 +81,8 @@ Password-reset codes are delivered to Administration → Local outbox (no email 
 | Migrate / seed | `npm run db:migrate` / `npm run db:seed` |
 | Reset clinical data (confirms first; keeps assessment records) | `npm run db:reset` (`-- --yes`, `-- --include-assessment`) |
 | Typecheck / lint / build | `npm run typecheck` · `npm run lint` · `npm run build` |
+| Tests | `npm test` (API and unit tests) · `npm run test:e2e` (Playwright browser tests) |
+| API reference | sign in as an administrator, then open `/api/docs` (JSON at `/api/openapi.json`) |
 
 Environment variables are listed in `.env.example` (`LAB_MODE`, `LAB_VULNS`, `HOST`, `PORT`, `DATABASE_URL`, `LIVE_SIM`, …). With no `DATABASE_URL` the database lives in `./.pglite`.
 
@@ -93,8 +113,14 @@ assessment/  manifest (internal), evidence & report output dirs (git-ignored con
 lab-data/    synthetic files for the path-handling scenario
 ```
 
+## Quality gates
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request: lint, typecheck, the API and unit tests (embedded PostgreSQL), a production build, a dependency audit, the Playwright browser tests, and a Docker job that builds the images and checks that both secure and lab modes start healthy and behave as documented (lab routes are 404 in secure mode).
+
 ## Known limitations
-- Docker images are untested in the original environment; ESLint is pinned to v9 (the react-hooks plugin does not support v10 yet).
+- Interface translations cover navigation, the top bar, sign-in, onboarding, shortcuts and page headings; clinical content and detailed form text remain in English.
+- Reminders, confirmations and password-reset codes are simulated in a local outbox. TOTP codes need an authenticator app (or the setup key).
+- PDFs are generated with a small built-in writer (Helvetica, Latin-1 text); non-Latin characters are replaced by `?`.
+- ESLint is pinned to v9 (the react-hooks plugin does not support v10 yet).
 - The frontend ships as a single ~770 kB bundle.
 - Appointment times use the browser's local clock; the dashboard's "today" uses the database date, so they can disagree for a few hours around midnight.
 - No OWASP ZAP scan or assessment report is bundled; the assessment itself is left to the user.

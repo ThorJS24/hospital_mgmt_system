@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: 24
+
+jobs:
+  quality:
+    name: Lint, typecheck, unit and API tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Backend API tests (embedded PostgreSQL via PGlite)
+        run: npm run test -w backend
+      - name: Frontend unit tests
+        run: npm run test -w frontend
+      - run: npm run build
+      - name: Dependency audit (production dependencies, high severity and above; advisory only)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+
+  e2e:
+    name: Browser tests (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+        env:
+          CI: "true"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
+
+  docker:
+    name: Docker images build and start (secure and lab modes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the images
+        run: docker compose build
+      - name: Secure mode starts healthy and exposes no lab routes
+        run: |
+          docker compose up -d
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4000/api/health >/dev/null 2>&1; then break; fi
+            sleep 3
+          done
+          curl -fsS http://127.0.0.1:4000/api/health
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4000/api/lab/search-page?q=x)" = "404"
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5173/ >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:5173/ | grep -qi "<div id=\"root\">"
+          # sign in through the front-end proxy: session -> CSRF token -> login
+          jar=$(mktemp)
+          token=$(curl -fsS -c "$jar" http://127.0.0.1:5173/api/auth/session | python3 -c 'import sys,json; print(json.load(sys.stdin)["csrfToken"])')
+          curl -fsS -b "$jar" -c "$jar" -H "X-CSRF-Token: $token" -H 'Content-Type: application/json' \
+            -d '{"username":"admin.hartley","password":"LabAdmin#2026"}' http://127.0.0.1:5173/api/auth/login | grep -q '"authenticated":true'
+          docker compose down -v
+      - name: Lab mode starts healthy and serves the lab routes
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.lab.yml up -d
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4000/api/health >/dev/null 2>&1; then break; fi
+            sleep 3
+          done
+          curl -fsS http://127.0.0.1:4000/api/health | grep -q '"labMode":"vulnerable"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' 'http://127.0.0.1:4000/api/lab/search-page?q=x')" = "200"
+      - name: Container logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail=200
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.lab.yml down -v

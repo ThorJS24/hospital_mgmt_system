@@ -18,6 +18,13 @@ import Reports from './pages/Reports';
 import Admin from './pages/Admin';
 import Assessment from './pages/Assessment';
 import Profile from './pages/Profile';
+import Consultations from './pages/Consultations';
+import Consultation from './pages/Consultation';
+import Triage from './pages/Triage';
+import Mar from './pages/Mar';
+import Inventory from './pages/Inventory';
+import Roster from './pages/Roster';
+import Portal from './pages/Portal';
 
 function Guard({ perms, children }: { perms: string[]; children: ReactNode }) {
   const { can } = useAuth();
@@ -35,7 +42,14 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<Navigate to={firstAllowed(can)} replace />} />
+        <Route path="portal" element={g(['portal.access'], <Portal />)} />
         <Route path="dashboard" element={g(['dashboard.read'], <Dashboard />)} />
+        <Route path="consultations" element={g(['consultations.read'], <Consultations />)} />
+        <Route path="consultations/:id" element={g(['consultations.read'], <Consultation />)} />
+        <Route path="triage" element={g(['triage.read'], <Triage />)} />
+        <Route path="mar" element={g(['mar.read'], <Mar />)} />
+        <Route path="inventory" element={g(['inventory.read'], <Inventory />)} />
+        <Route path="roster" element={g(['staff.read'], <Roster />)} />
         <Route path="patients" element={g(['patients.read_all', 'patients.read_scoped'], <Patients />)} />
         <Route path="patients/:id" element={g(['patients.read_all', 'patients.read_scoped'], <PatientDetail />)} />
         <Route path="appointments" element={g(['appointments.read'], <Appointments />)} />

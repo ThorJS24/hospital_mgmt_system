@@ -26,3 +26,12 @@ Run `npm run start:secure` (or `docker compose up` without the lab override). Ev
 
 ## Resetting
 `npm run db:reset` rebuilds the synthetic clinical data and preserves assessment records; add `-- --include-assessment` to wipe those too.
+
+## Features added after the hardening pass
+- New endpoints follow the same controls as the rest of the API: zod validation, parameterised SQL, `requirePermission`, CSRF on every unsafe method, and object-level scoping where records belong to a care team.
+- The patient portal derives the patient from the session, so there is no patient identifier in any portal URL or body to tamper with.
+- CSV exports prefix cells that start with `=`, `+`, `-` (non-numeric), `@`, tab or CR with an apostrophe to prevent spreadsheet formula injection.
+- PDFs are produced server-side from plain data (no HTML rendering, no remote resources). Filenames in `Content-Disposition` are generated from sanitised identifiers.
+- Reminders and confirmations are written to a local table; the application still makes no outbound HTTP, SMTP or SMS calls.
+- API reference pages are administrator-only and served with a strict Content-Security-Policy (`script-src 'self'`).
+- The five intentionally remaining weaknesses (HMS-V03, V10, V14, V17, V18) are unchanged and only exist in lab mode.

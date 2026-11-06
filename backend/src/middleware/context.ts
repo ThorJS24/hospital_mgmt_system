@@ -17,6 +17,8 @@ export interface SessionUser {
   roleName: string;
   staffId: number | null;
   departmentId: number | null;
+  patientId: number | null;
+  totpEnabled: boolean;
   permissions: string[];
 }
 
@@ -45,19 +47,22 @@ export function setSessionCookie(res: Response, cfg: AppConfig, id: string) {
   });
 }
 
-export async function createSession(db: Db, cfg: AppConfig, userId: number | null = null): Promise<{ id: string; csrf: string }> {
+export interface SessionMeta { ip?: string; userAgent?: string }
+export const sessionMeta = (req: Request): SessionMeta => ({ ip: String(req.ip ?? '').slice(0, 64), userAgent: String(req.get('user-agent') ?? '').slice(0, 200) });
+
+export async function createSession(db: Db, cfg: AppConfig, userId: number | null = null, meta: SessionMeta = {}): Promise<{ id: string; csrf: string }> {
   const id = randomToken(24);
   const csrf = randomToken(16);
   await db.query(
-    "INSERT INTO sessions(id,user_id,csrf_token,expires_at) VALUES ($1,$2,$3, now() + ($4 || ' minutes')::interval)",
-    [id, userId, csrf, String(cfg.sessionTtlMinutes)],
+    "INSERT INTO sessions(id,user_id,csrf_token,expires_at,ip,user_agent) VALUES ($1,$2,$3, now() + ($4 || ' minutes')::interval, $5, $6)",
+    [id, userId, csrf, String(cfg.sessionTtlMinutes), meta.ip ?? '', meta.userAgent ?? ''],
   );
   return { id, csrf };
 }
 
 export async function loadUser(db: Db, userId: number): Promise<SessionUser | null> {
   const { rows } = await db.query(
-    `SELECT u.id, u.username, u.full_name, u.email, u.staff_id, u.active, r.code AS role, r.name AS role_name, s.department_id
+    `SELECT u.id, u.username, u.full_name, u.email, u.staff_id, u.patient_id, u.totp_enabled, u.active, r.code AS role, r.name AS role_name, s.department_id
        FROM users u JOIN roles r ON r.id = u.role_id LEFT JOIN staff s ON s.id = u.staff_id WHERE u.id = $1`,
     [userId],
   );
@@ -65,7 +70,7 @@ export async function loadUser(db: Db, userId: number): Promise<SessionUser | nu
   if (!u || !u.active) return null;
   return {
     id: u.id, username: u.username, fullName: u.full_name, email: u.email, role: u.role, roleName: u.role_name,
-    staffId: u.staff_id, departmentId: u.department_id, permissions: permissionsFor(u.role),
+    staffId: u.staff_id, departmentId: u.department_id, patientId: u.patient_id, totpEnabled: !!u.totp_enabled, permissions: permissionsFor(u.role),
   };
 }
 
@@ -122,9 +127,11 @@ export const requireAuth: RequestHandler = (req, _res, next) => {
   if (!req.user) return next(new HttpError(401, 'Authentication required'));
   next();
 };
+// Markers read by the OpenAPI generator (routes/docs.ts); they do not affect request handling.
+(requireAuth as any).authRequired = true;
 
 export function requirePermission(...perms: string[]): RequestHandler {
-  return (req, _res, next) => {
+  const handler: RequestHandler = (req, _res, next) => {
     if (!req.user) return next(new HttpError(401, 'Authentication required'));
     if (!perms.some((p) => req.user!.permissions.includes(p))) {
       log('warn', 'authz_denied', { requestId: req.requestId, user: req.user.username, need: perms.join('|'), path: req.path });
@@ -132,6 +139,8 @@ export function requirePermission(...perms: string[]): RequestHandler {
     }
     next();
   };
+  (handler as any).requiredPermissions = perms;
+  return handler;
 }
 
 export const can = (req: Request, perm: string) => !!req.user?.permissions.includes(perm);

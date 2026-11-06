@@ -17,6 +17,15 @@ import { dashboardRoutes } from './routes/dashboard.js';
 import { adminRoutes } from './routes/admin.js';
 import { assessmentRoutes } from './routes/assessment.js';
 import { liveRoutes } from './routes/live.js';
+import { consultationRoutes } from './routes/consultations.js';
+import { clinicalRoutes } from './routes/clinical.js';
+import { notificationRoutes } from './routes/notifications.js';
+import { searchRoutes } from './routes/search.js';
+import { staffingRoutes } from './routes/staffing.js';
+import { inventoryRoutes } from './routes/inventory.js';
+import { reportRoutes } from './routes/reports.js';
+import { portalRoutes } from './routes/portal.js';
+import { docsRoutes } from './routes/docs.js';
 import { vulnerableRoutes } from './assessment/vulnerable/routes.js';
 
 export function createApp(db: Db, cfg: AppConfig) {
@@ -40,10 +49,13 @@ export function createApp(db: Db, cfg: AppConfig) {
   const api = express.Router();
   api.use(context(ctx));
   api.use(csrfGuard);
-  api.use(authRoutes(ctx));
-  for (const make of [patientRoutes, appointmentRoutes, inpatientRoutes, orgRoutes, laboratoryRoutes, pharmacyRoutes, billingRoutes, dashboardRoutes, adminRoutes, assessmentRoutes, liveRoutes]) {
-    api.use(make(ctx));
-  }
+  const auth = authRoutes(ctx);
+  api.use(auth);
+  const routers = [patientRoutes, appointmentRoutes, inpatientRoutes, orgRoutes, laboratoryRoutes, pharmacyRoutes, billingRoutes, dashboardRoutes, adminRoutes, assessmentRoutes, liveRoutes,
+    consultationRoutes, clinicalRoutes, notificationRoutes, searchRoutes, staffingRoutes, inventoryRoutes, reportRoutes, portalRoutes].map((make) => make(ctx));
+  for (const router of routers) api.use(router);
+  const docs = docsRoutes(ctx, () => [auth, ...routers, docs]);
+  api.use(docs);
   // Intentionally vulnerable scenarios exist ONLY in vulnerable mode; in secure mode /api/lab/* is a plain 404.
   if (cfg.labMode === 'vulnerable') api.use('/lab', vulnerableRoutes(ctx));
   api.use((_req, _res, next) => next(new HttpError(404, 'Not found')));

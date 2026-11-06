@@ -35,5 +35,11 @@ const AUDIT_MESSAGES: Record<string, string> = {
   prescription_dispense: 'Prescription dispensed',
   invoice_create: 'Invoice generated',
   payment_record: 'Payment received',
+  refund_record: 'Refund processed',
+  claim_decision: 'Insurance claim decided',
+  consultation_sign: 'Consultation signed',
+  triage_register: 'New arrival in the emergency queue',
+  mar_administer: 'Medication dose recorded',
+  prescription_refill: 'Prescription refilled',
 };
 export const auditMessage = (action: string) => AUDIT_MESSAGES[action];

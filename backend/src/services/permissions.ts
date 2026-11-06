@@ -7,6 +7,7 @@ export const ROLES = [
   'pharmacist',
   'billing_officer',
   'security_assessor',
+  'patient',
 ] as const;
 export type RoleCode = (typeof ROLES)[number];
 
@@ -19,6 +20,7 @@ export const ROLE_NAMES: Record<RoleCode, string> = {
   pharmacist: 'Pharmacist',
   billing_officer: 'Billing Officer',
   security_assessor: 'Security Assessor',
+  patient: 'Patient',
 };
 
 /**
@@ -57,6 +59,28 @@ export const PERMISSIONS: Record<string, { description: string; roles: RoleCode[
   'users.manage': { description: 'Manage application users and roles', roles: ['administrator'] },
   'config.manage': { description: 'Edit system configuration', roles: ['administrator'] },
   'audit.read': { description: 'Read audit events', roles: ['administrator'] },
+  'consultations.read': { description: 'View consultations and ICD-10 codes', roles: ['administrator', 'doctor', 'nurse'] },
+  'consultations.write': { description: 'Write and sign consultations', roles: ['doctor'] },
+  'vitals.write': { description: 'Record patient vitals', roles: ['administrator', 'doctor', 'nurse'] },
+  'mar.read': { description: 'View the medication administration record', roles: ['administrator', 'doctor', 'nurse'] },
+  'mar.schedule': { description: 'Schedule medication doses for admitted patients', roles: ['administrator', 'doctor'] },
+  'mar.administer': { description: 'Record administered doses', roles: ['administrator', 'nurse'] },
+  'discharge.read': { description: 'View discharge summaries', roles: ['administrator', 'doctor', 'nurse'] },
+  'discharge.write': { description: 'Write discharge summaries', roles: ['administrator', 'doctor'] },
+  'triage.read': { description: 'View the triage queue', roles: ['administrator', 'doctor', 'nurse', 'receptionist'] },
+  'triage.write': { description: 'Register and triage arrivals', roles: ['administrator', 'nurse', 'receptionist'] },
+  'triage.treat': { description: 'Start and complete emergency treatment', roles: ['administrator', 'doctor', 'nurse'] },
+  'prescriptions.refill': { description: 'Dispense prescription refills', roles: ['administrator', 'pharmacist'] },
+  'inventory.read': { description: 'View pharmacy inventory and suppliers', roles: ['administrator', 'pharmacist'] },
+  'inventory.manage': { description: 'Receive and adjust stock, manage suppliers', roles: ['administrator', 'pharmacist'] },
+  'roster.manage': { description: 'Edit staff shifts', roles: ['administrator'] },
+  'leave.request': { description: 'Request leave', roles: ['administrator', 'doctor', 'nurse', 'receptionist', 'lab_technician', 'pharmacist', 'billing_officer'] },
+  'leave.decide': { description: 'Approve or reject leave', roles: ['administrator'] },
+  'claims.read': { description: 'View insurance claims', roles: ['administrator', 'receptionist', 'billing_officer'] },
+  'claims.write': { description: 'Submit insurance claims', roles: ['administrator', 'billing_officer'] },
+  'claims.decide': { description: 'Record insurer decisions on claims', roles: ['administrator', 'billing_officer'] },
+  'refunds.write': { description: 'Issue refunds', roles: ['administrator', 'billing_officer'] },
+  'portal.access': { description: 'Use the patient portal for own records', roles: ['patient'] },
   'assessment.read': { description: 'View assessment register, manifest and test cases', roles: ['security_assessor'] },
   'assessment.write': { description: 'Record findings, results and evidence', roles: ['security_assessor'] },
   'assessment.export': { description: 'Export register and generate reports', roles: ['security_assessor'] },

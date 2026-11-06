@@ -4,6 +4,7 @@ import { seedAll } from './db/seed.js';
 import { createApp } from './app.js';
 import { configureLogger, log } from './utils/logger.js';
 import { startSimulator } from './services/simulator.js';
+import { startMaintenance } from './services/maintenance.js';
 
 async function main() {
   const cfg = loadConfig();
@@ -20,6 +21,7 @@ async function main() {
   }
 
   if (process.env.LIVE_SIM !== '0') startSimulator(db);
+  startMaintenance(db);
   const app = createApp(db, cfg);
   app.listen(cfg.port, cfg.host, () => {
     log('info', 'listening', { host: cfg.host, port: cfg.port, labMode: cfg.labMode, database: db.kind });

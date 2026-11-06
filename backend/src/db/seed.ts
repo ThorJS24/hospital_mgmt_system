@@ -3,9 +3,10 @@ import type { Db } from './index.js';
 import type { AppConfig } from '../config/index.js';
 import { PERMISSIONS, ROLES, ROLE_NAMES, permissionsFor } from '../services/permissions.js';
 import { hashPassword } from '../utils/crypto.js';
+import { seedExtended, type TestAccount } from './seedExtended.js';
 
 /** Development-only synthetic credentials (documented in README). */
-export const TEST_ACCOUNTS = [
+export const TEST_ACCOUNTS: readonly TestAccount[] = [
   { username: 'admin.hartley', role: 'administrator', name: 'Helena Hartley', password: 'LabAdmin#2026', staff: 'ADM-001' },
   { username: 'doctor.mehta', role: 'doctor', name: 'Dr. Arjun Mehta', password: 'LabDoctor#2026', staff: 'DOC-001' },
   { username: 'doctor.svensson', role: 'doctor', name: 'Dr. Ingrid Svensson', password: 'LabDoctor#2026', staff: 'DOC-005' },
@@ -15,7 +16,8 @@ export const TEST_ACCOUNTS = [
   { username: 'pharmacist.rossi', role: 'pharmacist', name: 'Giulia Rossi', password: 'LabPharm#2026', staff: 'PHM-001' },
   { username: 'billing.nakamura', role: 'billing_officer', name: 'Kenji Nakamura', password: 'LabBill#2026', staff: 'BIL-001' },
   { username: 'assessor.vance', role: 'security_assessor', name: 'Priya Vance', password: 'LabAssess#2026', staff: null },
-] as const;
+  { username: 'patient.portal', role: 'patient', name: 'Portal Patient', password: 'LabPatient#2026', staff: null, patientId: 5 },
+];
 
 function rng(seed: number) {
   return () => {
@@ -28,6 +30,8 @@ function rng(seed: number) {
 }
 
 const CLINICAL_TABLES = [
+  'notifications', 'outbox_messages', 'recovery_codes', 'login_challenges', 'stock_movements', 'drug_interactions', 'suppliers', 'insurance_claims', 'mar_doses', 'discharge_summaries',
+  'triage_entries', 'consultation_diagnoses', 'consultations', 'staff_shifts', 'staff_leave',
   'patient_vitals', 'medical_procedures', 'patient_payment_methods', 'audit_events', 'payments', 'invoice_items', 'invoices', 'prescription_items', 'prescriptions', 'medications',
   'laboratory_results', 'laboratory_requests', 'laboratory_tests', 'admissions', 'beds', 'wards', 'appointments',
   'patient_documents', 'medical_histories', 'patient_allergies', 'patient_contacts', 'patients', 'reset_tokens',
@@ -100,7 +104,7 @@ export async function seedClinical(db: Db): Promise<void> {
   const doctorIds = (await db.query<{ id: number; department_id: number }>("SELECT id, department_id FROM staff WHERE staff_code LIKE 'DOC-%' ORDER BY id")).rows;
 
   // users
-  for (const a of TEST_ACCOUNTS) {
+  for (const a of TEST_ACCOUNTS.filter((x) => x.role !== 'patient')) {
     await db.query(
       'INSERT INTO users(username,email,full_name,password_hash,role_id,staff_id) SELECT $1,$2,$3,$4,r.id,$5 FROM roles r WHERE r.code=$6',
       [a.username, `${a.username}@medicore.example.test`, a.name, hashPassword(a.password), a.staff ? await sid(a.staff) : null, a.role],
@@ -253,8 +257,10 @@ export async function seedClinical(db: Db): Promise<void> {
     ['hospital_name', 'MediCore Teaching Hospital (fictional)', 'Display name'],
     ['appointment_default_minutes', '30', 'Default appointment length'],
     ['currency', 'USD', 'Billing currency (synthetic)'],
+    ['reminder_hours', '24', 'Send appointment reminders this many hours ahead'],
   ];
   for (const c of cfg) await db.query('INSERT INTO system_config(key,value,description) VALUES ($1,$2,$3)', c);
+  await seedExtended(db, TEST_ACCOUNTS);
   await db.query("INSERT INTO audit_events(user_id,action,entity,detail) VALUES (NULL,'seed','system','Synthetic dataset created')");
 }
 

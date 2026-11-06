@@ -2,7 +2,9 @@ import { useState, type FormEvent } from 'react';
 import { CalendarCheck2, FlaskConical, ShieldCheck, BedDouble } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { post } from '../lib/api';
+import { useT } from '../lib/i18n';
 import { Alert, Button, TextField, errMsg, fieldErrors } from '../components/ui';
+import { PasswordStrength } from '../components/PasswordStrength';
 import { Brand } from '../components/Layout';
 
 const FEATURES = [
@@ -12,30 +14,48 @@ const FEATURES = [
   [ShieldCheck, 'Role-based access', 'Every action checked against the staff role'],
 ] as const;
 
+type Mode = 'login' | 'twofactor' | 'request' | 'confirm';
+
 export default function Login() {
-  const { login, lab } = useAuth();
-  const [mode, setMode] = useState<'login' | 'request' | 'confirm'>('login');
-  const [f, setF] = useState({ username: '', password: '', token: '', newPassword: '' });
+  const { login, verifyTwoFactor, lab } = useAuth();
+  const { t } = useT();
+  const [mode, setMode] = useState<Mode>('login');
+  const [f, setF] = useState({ username: '', password: '', token: '', newPassword: '', code: '' });
+  const [challenge, setChallenge] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [fe, setFe] = useState<Record<string, string>>({});
   const [ok, setOk] = useState('');
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
+  const afterSignIn = () => {
+    const next = new URLSearchParams(window.location.search).get('next');
+    if (next && lab.mode === 'vulnerable') window.location.assign(`/api/lab/auth/redirect?next=${encodeURIComponent(next)}`);
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault(); setBusy(true); setErr(''); setFe({}); setOk('');
     const username = f.username.trim();
     try {
       if (mode === 'login') {
-        await login(username, f.password);
-        const next = new URLSearchParams(window.location.search).get('next');
-        if (next && lab.mode === 'vulnerable') window.location.assign(`/api/lab/auth/redirect?next=${encodeURIComponent(next)}`);
-      }
-      else if (mode === 'request') { const r = await post('/api/auth/password-reset/request', { username }); setOk(r.message); setMode('confirm'); }
+        const r = await login(username, f.password);
+        if (r.twoFactorRequired && r.challenge) { setChallenge(r.challenge); setF({ ...f, password: '', code: '' }); setMode('twofactor'); }
+        else afterSignIn();
+      } else if (mode === 'twofactor') {
+        await verifyTwoFactor(challenge, f.code.trim());
+        afterSignIn();
+      } else if (mode === 'request') { const r = await post('/api/auth/password-reset/request', { username }); setOk(r.message); setMode('confirm'); }
       else { await post('/api/auth/password-reset/confirm', { username, token: f.token.trim(), new_password: f.newPassword }); setOk('Password updated. You can sign in now.'); setMode('login'); }
-    } catch (x) { setErr(errMsg(x)); setFe(fieldErrors(x)); }
+    } catch (x) {
+      setErr(errMsg(x)); setFe(fieldErrors(x));
+      if (mode === 'twofactor' && /expired|too many/i.test(errMsg(x))) { setMode('login'); setChallenge(''); }
+    }
     setBusy(false);
   };
+
+  const title = mode === 'login' ? t('login.welcome') : mode === 'twofactor' ? t('login.twoTitle') : mode === 'request' ? 'Reset password' : 'Enter reset code';
+  const subtitle = mode === 'login' ? t('login.sub') : mode === 'twofactor' ? t('login.twoSub') : mode === 'request' ? 'Enter your username to receive a one-time code.' : 'Enter the code and choose a new password.';
+  const submitLabel = mode === 'login' ? t('login.signIn') : mode === 'twofactor' ? t('login.verify') : mode === 'request' ? 'Send reset code' : 'Set new password';
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -46,8 +66,8 @@ export default function Login() {
             <h2 className="text-4xl font-semibold leading-tight tracking-tight">Coordinated care, from front desk to bedside.</h2>
             <p className="mt-3 text-white/70">One workspace for patients, clinicians and hospital operations.</p>
             <ul className="mt-8 space-y-4">
-              {FEATURES.map(([Icon, t, d]) => (
-                <li key={t} className="flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10"><Icon className="h-4 w-4" aria-hidden /></span><span><span className="block font-medium">{t}</span><span className="text-sm text-white/65">{d}</span></span></li>
+              {FEATURES.map(([Icon, ft, d]) => (
+                <li key={ft} className="flex items-start gap-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10"><Icon className="h-4 w-4" aria-hidden /></span><span><span className="block font-medium">{ft}</span><span className="text-sm text-white/65">{d}</span></span></li>
               ))}
             </ul>
           </div>
@@ -56,18 +76,22 @@ export default function Login() {
         <main className="flex items-center justify-center bg-bg p-6">
           <form onSubmit={submit} className="card-shadow w-full max-w-sm space-y-4 rounded-2xl border border-line bg-surface p-7" aria-labelledby="login-title">
             <div className="lg:hidden"><Brand light={false} /></div>
-            <div><h1 id="login-title" className="text-2xl font-semibold tracking-tight">{mode === 'login' ? 'Welcome back' : mode === 'request' ? 'Reset password' : 'Enter reset code'}</h1><p className="mt-1 text-sm text-muted">{mode === 'login' ? 'Sign in with your staff account.' : mode === 'request' ? 'We will place a reset code in the local outbox.' : 'Use the code from the local outbox.'}</p></div>
+            <div><h1 id="login-title" className="text-2xl font-semibold tracking-tight">{title}</h1><p className="mt-1 text-sm text-muted">{subtitle}</p></div>
             {err && <Alert>{err}</Alert>}
             {ok && <Alert tone="ok">{ok}</Alert>}
-            <TextField label="Username" required autoComplete="username" autoFocus value={f.username} onChange={set('username')} error={fe.username} />
-            {mode === 'login' && <TextField label="Password" type="password" required autoComplete="current-password" value={f.password} onChange={set('password')} error={fe.password} />}
+            {mode !== 'twofactor' && <TextField label={t('login.username')} required autoComplete="username" autoFocus value={f.username} onChange={set('username')} error={fe.username} />}
+            {mode === 'login' && <TextField label={t('login.password')} type="password" required autoComplete="current-password" value={f.password} onChange={set('password')} error={fe.password} />}
+            {mode === 'twofactor' && <TextField label={t('login.code')} required autoFocus autoComplete="one-time-code" inputMode="text" value={f.code} onChange={set('code')} hint="6 digits, or a recovery code such as 1a2b-3c4d" />}
             {mode === 'confirm' && <>
               <TextField label="Reset code" required value={f.token} onChange={set('token')} hint="Delivered to the local synthetic outbox (Administration → Local outbox)." error={fe.token} />
-              <TextField label="New password" type="password" required autoComplete="new-password" value={f.newPassword} onChange={set('newPassword')} hint="At least 10 characters" error={fe.new_password} />
+              <TextField label="New password" type="password" required autoComplete="new-password" value={f.newPassword} onChange={set('newPassword')} error={fe.new_password} />
+              <PasswordStrength value={f.newPassword} username={f.username.trim()} />
             </>}
-            <Button type="submit" loading={busy} className="w-full py-2.5">{mode === 'login' ? 'Sign in' : mode === 'request' ? 'Send reset code' : 'Set new password'}</Button>
+            <Button type="submit" loading={busy} className="w-full py-2.5">{submitLabel}</Button>
             <div className="text-center text-sm">
-              {mode === 'login' ? <button type="button" className="text-primary hover:underline" onClick={() => { setMode('request'); setErr(''); setOk(''); }}>Forgot password?</button> : <button type="button" className="text-primary hover:underline" onClick={() => { setMode('login'); setErr(''); }}>Back to sign in</button>}
+              {mode === 'login'
+                ? <button type="button" className="text-primary hover:underline" onClick={() => { setMode('request'); setErr(''); setOk(''); }}>{t('login.forgot')}</button>
+                : <button type="button" className="text-primary hover:underline" onClick={() => { setMode('login'); setErr(''); setOk(''); setChallenge(''); }}>{t('login.backToSignIn')}</button>}
             </div>
             <p className="border-t border-line pt-3 text-center text-xs text-muted">Development accounts are listed in the project README.</p>
           </form>

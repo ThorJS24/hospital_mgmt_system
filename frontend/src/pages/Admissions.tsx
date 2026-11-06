@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { get, post, fmtDateTime } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { Alert, Button, Card, EmptyState, Modal, PageHeader, SelectField, Spinner, StatusBadge, Tabs, TextField, errMsg, useAsync, useToast } from '../components/ui';
+import { DischargeSummary } from '../components/DischargeSummary';
 
 export default function Admissions() {
   const { can } = useAuth(); const toast = useToast();
@@ -10,6 +11,7 @@ export default function Admissions() {
   const wards = useAsync(() => get('/api/wards'), []);
   const adm = useAsync(() => get(`/api/admissions?status=${tab}`), [tab]);
   const [open, setOpen] = useState(false);
+  const [summary, setSummary] = useState<number | null>(null);
   const manage = can('admissions.manage');
   const refresh = () => { wards.reload(); adm.reload(); };
   const discharge = async (id: number) => { try { await post(`/api/admissions/${id}/discharge`); toast('Patient discharged'); refresh(); } catch (x) { toast(errMsg(x), 'danger'); } };
@@ -33,10 +35,11 @@ export default function Admissions() {
         <div className="mt-3 overflow-x-auto">
           {adm.error ? <Alert>{adm.error}</Alert> : adm.loading ? <Spinner /> : !(adm.data?.data ?? []).length ? <EmptyState title="No admissions" /> : (
             <table className="w-full text-left text-sm"><caption className="sr-only-live">Admissions</caption><thead className="text-xs uppercase text-muted"><tr><th className="px-2 py-1">Patient</th><th>Ward / bed</th><th>Doctor</th><th>Admitted</th><th>{tab === 'Discharged' ? 'Discharged' : 'Reason'}</th><th>Status</th><th /></tr></thead>
-              <tbody>{adm.data.data.map((a: any) => <tr key={a.id} className="border-t border-line"><td className="px-2 py-1.5">{a.patient} <span className="text-muted">({a.mrn})</span></td><td>{a.ward} · {a.bed}</td><td>{a.doctor}</td><td>{fmtDateTime(a.admitted_at)}</td><td>{tab === 'Discharged' ? fmtDateTime(a.discharged_at) : a.reason}</td><td><StatusBadge status={a.status} /></td><td className="text-right">{manage && a.status === 'Admitted' && <Button variant="secondary" onClick={() => void discharge(a.id)}>Discharge</Button>}</td></tr>)}</tbody></table>
+              <tbody>{adm.data.data.map((a: any) => <tr key={a.id} className="border-t border-line"><td className="px-2 py-1.5">{a.patient} <span className="text-muted">({a.mrn})</span></td><td>{a.ward} · {a.bed}</td><td>{a.doctor}</td><td>{fmtDateTime(a.admitted_at)}</td><td>{tab === 'Discharged' ? fmtDateTime(a.discharged_at) : a.reason}</td><td><StatusBadge status={a.status} /></td><td className="text-right"><span className="inline-flex flex-wrap justify-end gap-1.5">{can('discharge.read') && <Button variant="ghost" onClick={() => setSummary(a.id)}>Summary</Button>}{manage && a.status === 'Admitted' && <Button variant="secondary" onClick={() => void discharge(a.id)}>Discharge</Button>}</span></td></tr>)}</tbody></table>
           )}
         </div>
       </Card>
+      <DischargeSummary admissionId={summary} canWrite={can('discharge.write')} onClose={() => setSummary(null)} />
       <AdmitDialog open={open} wards={wards.data ?? []} onClose={() => setOpen(false)} onDone={() => { setOpen(false); refresh(); toast('Patient admitted'); }} />
     </div>
   );

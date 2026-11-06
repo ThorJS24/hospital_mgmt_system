@@ -6,6 +6,7 @@ import type { Ctx } from '../middleware/context.js';
 import { audit, requirePermission } from '../middleware/context.js';
 import { HttpError, intParam, pageQuery, parse } from '../utils/http.js';
 import { scopeClause, canAccessPatient } from '../services/patients.js';
+import { checkCriticalLab, notifyPatient } from '../services/notifications.js';
 
 const STATUSES = ['Requested', 'In progress', 'Resulted', 'Approved', 'Cancelled'] as const;
 
@@ -78,6 +79,7 @@ export function laboratoryRoutes({ db, cfg }: Ctx) {
       await t.query("UPDATE laboratory_requests SET status='Resulted' WHERE id=$1", [id]);
     });
     await audit(db, req, 'lab_result', 'laboratory_request', id);
+    await checkCriticalLab(db, id);
     res.status(201).json({ ok: true });
   });
 
@@ -91,6 +93,8 @@ export function laboratoryRoutes({ db, cfg }: Ctx) {
       await t.query("UPDATE laboratory_requests SET status='Approved' WHERE id=$1", [id]);
     });
     await audit(db, req, 'lab_approve', 'laboratory_request', id);
+    const owner = (await db.query('SELECT patient_id FROM laboratory_requests WHERE id=$1', [id])).rows[0];
+    await notifyPatient(db, owner.patient_id, { kind: 'lab_result', title: 'A new test result is available', link: '/portal', dedupeKey: `labres:${id}` });
     res.json({ ok: true });
   });
 

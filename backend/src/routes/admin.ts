@@ -5,6 +5,8 @@ import { audit, requirePermission } from '../middleware/context.js';
 import { HttpError, intParam, pageQuery, parse } from '../utils/http.js';
 import { hashPassword } from '../utils/crypto.js';
 import { ROLES } from '../services/permissions.js';
+import { passwordRule } from '../utils/password.js';
+import { runMaintenance } from '../services/maintenance.js';
 
 /** Ordinary hospital administrators must not create, promote or demote assessors (assessment administration is separate). */
 const ASSESSOR = 'security_assessor';
@@ -19,7 +21,7 @@ export function adminRoutes({ db }: Ctx) {
     let where = 'true';
     if (pq.q) { params.push(`%${pq.q}%`); where = '(u.username ILIKE $1 OR u.full_name ILIKE $1)'; }
     const total = (await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM users u WHERE ${where}`, params)).rows[0].n;
-    const data = (await db.query(`SELECT u.id, u.username, u.full_name, u.email, u.active, r.code AS role, r.name AS role_name, u.staff_id, u.created_at
+    const data = (await db.query(`SELECT u.id, u.username, u.full_name, u.email, u.active, r.code AS role, r.name AS role_name, u.staff_id, u.patient_id, u.totp_enabled, u.created_at
       FROM users u JOIN roles r ON r.id=u.role_id WHERE ${where} ORDER BY u.username LIMIT ${pq.pageSize} OFFSET ${(pq.page - 1) * pq.pageSize}`, params)).rows;
     res.json({ data, total, page: pq.page, pageSize: pq.pageSize });
   });
@@ -27,11 +29,19 @@ export function adminRoutes({ db }: Ctx) {
   r.post('/admin/users', requirePermission('users.manage'), async (req, res) => {
     const b = parse(z.object({
       username: z.string().regex(/^[a-z][a-z0-9._-]{2,31}$/, 'Lowercase letters, digits, . _ - (3-32 chars)'), full_name: z.string().min(2).max(100),
-      email: z.email().max(200), role: roleEnum, staff_id: z.number().int().positive().nullable().optional(), password: z.string().min(10).max(128),
+      email: z.email().max(200), role: roleEnum, staff_id: z.number().int().positive().nullable().optional(), patient_id: z.number().int().positive().nullable().optional(), password: passwordRule,
     }), req.body);
     if (b.role === ASSESSOR) throw new HttpError(403, 'Assessor accounts are provisioned through assessment administration, not hospital administration');
+    if (b.role === 'patient') {
+      if (!b.patient_id) throw new HttpError(400, 'A patient account must be linked to a patient record');
+      if (!(await db.query('SELECT 1 FROM patients WHERE id=$1', [b.patient_id])).rows.length) throw new HttpError(400, 'Patient not found');
+      if ((await db.query('SELECT 1 FROM users WHERE patient_id=$1', [b.patient_id])).rows.length) throw new HttpError(409, 'This patient already has a portal account');
+    } else if (b.patient_id) {
+      throw new HttpError(400, 'Only patient accounts can be linked to a patient record');
+    }
+    if (b.password.toLowerCase().includes(b.username.toLowerCase())) throw new HttpError(400, 'Password must not contain the username');
     if ((await db.query('SELECT 1 FROM users WHERE username=$1', [b.username])).rows.length) throw new HttpError(409, 'Username already exists');
-    const { rows } = await db.query('INSERT INTO users(username,email,full_name,password_hash,role_id,staff_id) SELECT $1,$2,$3,$4,r.id,$5 FROM roles r WHERE r.code=$6 RETURNING id', [b.username, b.email, b.full_name, hashPassword(b.password), b.staff_id ?? null, b.role]);
+    const { rows } = await db.query('INSERT INTO users(username,email,full_name,password_hash,role_id,staff_id,patient_id) SELECT $1,$2,$3,$4,r.id,$5,$7 FROM roles r WHERE r.code=$6 RETURNING id', [b.username, b.email, b.full_name, hashPassword(b.password), b.staff_id ?? null, b.role, b.patient_id ?? null]);
     await audit(db, req, 'user_create', 'user', rows[0].id, `role=${b.role}`);
     res.status(201).json({ id: rows[0].id });
   });
@@ -42,6 +52,7 @@ export function adminRoutes({ db }: Ctx) {
     const cur = (await db.query('SELECT u.id, r.code AS role FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=$1', [id])).rows[0];
     if (!cur) throw new HttpError(404, 'User not found');
     if (cur.role === ASSESSOR || b.role === ASSESSOR) throw new HttpError(403, 'Assessor accounts cannot be modified by hospital administrators');
+    if (b.role && (b.role === 'patient') !== (cur.role === 'patient')) throw new HttpError(400, 'Patient portal accounts cannot be converted to or from staff roles; create a new account instead');
     if (id === req.user!.id && (b.active === false || (b.role && b.role !== 'administrator'))) throw new HttpError(409, 'You cannot demote or deactivate your own account');
     if (b.role) await db.query('UPDATE users SET role_id=(SELECT id FROM roles WHERE code=$1) WHERE id=$2', [b.role, id]);
     if (b.active !== undefined) await db.query('UPDATE users SET active=$1 WHERE id=$2', [b.active, id]);
@@ -77,6 +88,24 @@ export function adminRoutes({ db }: Ctx) {
   r.get('/admin/outbox', requirePermission('users.manage'), async (_req, res) => {
     if (process.env.NODE_ENV === 'production') throw new HttpError(404, 'Not found');
     res.json({ data: (await db.query("SELECT t.id, u.username, t.token AS code, t.created_at, t.expires_at, t.used FROM reset_tokens t JOIN users u ON u.id=t.user_id WHERE t.created_at > now() - interval '1 day' ORDER BY t.id DESC LIMIT 20")).rows, note: 'Synthetic local outbox - no email is sent.' });
+  });
+
+  /** Messages the system would have e-mailed or texted (appointment reminders and confirmations). Nothing leaves this machine. */
+  r.get('/admin/outbox/messages', requirePermission('users.manage'), async (req, res) => {
+    const pq = pageQuery(req.query);
+    const params: unknown[] = [];
+    let where = 'true';
+    if (req.query.channel) { params.push(parse(z.enum(['email', 'sms']), req.query.channel)); where = `channel=$${params.length}`; }
+    const total = (await db.query<{ n: number }>(`SELECT count(*)::int AS n FROM outbox_messages WHERE ${where}`, params)).rows[0].n;
+    const data = (await db.query(`SELECT id, channel, recipient, subject, body, kind, related_id, created_at FROM outbox_messages WHERE ${where} ORDER BY id DESC LIMIT ${pq.pageSize} OFFSET ${(pq.page - 1) * pq.pageSize}`, params)).rows;
+    res.json({ data, total, page: pq.page, pageSize: pq.pageSize, note: 'Synthetic local outbox - nothing is sent.' });
+  });
+
+  /** Runs the alert scans, appointment reminders and clean-up immediately (they also run every 15 minutes). */
+  r.post('/admin/maintenance/run', requirePermission('users.manage'), async (req, res) => {
+    const result = await runMaintenance(db);
+    await audit(db, req, 'maintenance_run', 'system', '', JSON.stringify(result));
+    res.json(result);
   });
 
   return r;

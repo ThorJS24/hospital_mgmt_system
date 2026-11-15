@@ -25,6 +25,7 @@ import Mar from './pages/Mar';
 import Inventory from './pages/Inventory';
 import Roster from './pages/Roster';
 import Portal from './pages/Portal';
+import ChangePasswordRequired from './pages/ChangePasswordRequired';
 
 function Guard({ perms, children }: { perms: string[]; children: ReactNode }) {
   const { can } = useAuth();
@@ -37,6 +38,7 @@ export default function App() {
   if (loading) return <Spinner label="Starting MediCore" />;
   if (backendDown) return <div className="p-6"><Alert>Cannot reach the MediCore API on 127.0.0.1:4000. Start the backend (see README) and reload.</Alert></div>;
   if (!user) return <Routes><Route path="*" element={<Login />} /></Routes>;
+  if (user.mustChangePassword) return <ChangePasswordRequired />;
   const g = (perms: string[], el: ReactNode) => <Guard perms={perms}>{el}</Guard>;
   return (
     <Routes>

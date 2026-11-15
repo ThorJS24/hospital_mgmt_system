@@ -301,6 +301,37 @@ test('theme switch applies everywhere and persists; layout does not overflow on 
   }
 });
 
+test('a new account must choose its own password before anything else, and weak choices are blocked live', async ({ page, browser }) => {
+  await login(page, 'admin.hartley');
+  const csrf = (await (await page.request.get('/api/auth/session')).json()).csrfToken;
+  const made = await page.request.post('/api/admin/users', { headers: { 'x-csrf-token': csrf }, data: { username: 'new.starter', full_name: 'New Starter', email: 'new.starter@example.test', role: 'receptionist', password: 'Willow-Anchor-Pebble-42' } });
+  expect(made.status()).toBe(201);
+  const ctx = await browser.newContext();
+  const p2 = await ctx.newPage();
+  await p2.addInitScript(() => { try { localStorage.setItem('medicore-tour-v1', 'done'); } catch { /* ignore */ } });
+  await p2.goto('/');
+  await p2.getByLabel('Username').fill('new.starter');
+  await p2.getByLabel('Password').fill('Willow-Anchor-Pebble-42');
+  await p2.getByRole('button', { name: 'Sign in' }).click();
+  await expect(p2.getByRole('heading', { name: 'Choose a new password' })).toBeVisible();
+  await expect(p2.getByRole('navigation', { name: 'Primary' })).toHaveCount(0); // nothing else is reachable
+  const save = p2.getByRole('button', { name: 'Save and continue' });
+  await p2.getByLabel('Temporary (current) password').fill('Willow-Anchor-Pebble-42');
+  const pw = p2.getByRole('textbox', { name: /^New password/ });
+  const repeat = p2.getByLabel('Repeat the new password');
+  for (const weak of ['short', 'passwordpassword', 'new.starter-is-me-today']) { await pw.fill(weak); await repeat.fill(weak); await expect(save).toBeDisabled(); }
+  await pw.fill('all lower case words are fine here'); // no symbol or capital-letter rules
+  await repeat.fill('something different entirely');
+  await expect(p2.getByText('The two passwords do not match')).toBeVisible();
+  await expect(save).toBeDisabled();
+  await repeat.fill('all lower case words are fine here');
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(p2.getByRole('navigation', { name: 'Primary' })).toBeVisible();
+  await expect(p2.getByRole('heading', { name: 'Choose a new password' })).toHaveCount(0);
+  await ctx.close();
+});
+
 // last on purpose: it leaves two-step verification enabled for this account
 test('two-step verification: enrol with an authenticator code, then sign in with it', async ({ page }) => {
   const totp = (secret: string, offset = 0) => {

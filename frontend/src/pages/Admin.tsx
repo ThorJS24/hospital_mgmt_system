@@ -59,8 +59,8 @@ function AddUser({ open, onClose, onDone }: { open: boolean; onClose: () => void
         <TextField label="Email" type="email" required value={f.email} onChange={set('email')} error={fe.email} />
         <SelectField label="Role" required value={f.role} onChange={set('role')}>{ROLES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</SelectField>
         {f.role === 'patient' && <PatientPicker label="Linked patient record" value={patientId} onChange={setPatientId} error={fe.patient_id} />}
-        <TextField label="Initial password" type="password" required autoComplete="new-password" value={f.password} onChange={set('password')} error={fe.password} />
-        <PasswordStrength value={f.password} username={f.username} />
+        <TextField label="Temporary password (the user must change it at first sign-in)" type="password" required autoComplete="new-password" value={f.password} onChange={set('password')} error={fe.password} />
+        <PasswordStrength value={f.password} context={{ username: f.username, fullName: f.full_name, email: f.email }} />
         <div className="flex justify-end gap-2"><Button type="button" variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" loading={busy} disabled={f.role === 'patient' && !patientId}>Create user</Button></div>
       </form>
     </Modal>

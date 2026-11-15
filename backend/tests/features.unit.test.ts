@@ -5,7 +5,8 @@ import { parseSchedule, isDate, weekdayOf } from '../src/services/staffing.js';
 import { ageInYears, flagRow, flagValue, hasCritical } from '../src/services/vitals.js';
 import { rangeFlag } from '../src/routes/portal.js';
 import { csvCell, toCsv } from '../src/routes/reports.js';
-import { characterClasses, passwordIssues, passwordRule } from '../src/utils/password.js';
+import { passwordIssues, passwordRule } from '../src/utils/password.js';
+import { checkPassword, strengthOf } from '../../shared/passwordPolicy.js';
 import { buildOpenApi } from '../src/routes/docs.js';
 import { Router } from 'express';
 import { requirePermission, requireAuth } from '../src/middleware/context.js';
@@ -142,20 +143,42 @@ describe('CSV export safety', () => {
 });
 
 describe('password policy', () => {
-  it('counts character classes and lists concrete problems', () => {
-    expect(characterClasses('abc')).toBe(1);
-    expect(characterClasses('Abc1')).toBe(3);
-    expect(characterClasses('Abc1!')).toBe(4);
-    expect(passwordIssues('short1A!')).toContain('Use at least 10 characters');
-    expect(passwordIssues('alllowercaseletters')).toEqual(['Mix at least three of: lowercase, uppercase, digits, symbols']);
-    expect(passwordIssues('Nurse.okafor2026!', 'nurse.okafor')).toContain('Must not contain your username');
-    expect(passwordIssues('MyPassword123!')).toContain('Avoid common words such as "password" or "admin"');
+  it('requires a long password but no character-class rules (NIST SP 800-63B / OWASP)', () => {
+    expect(passwordIssues('short1A!')).toEqual(['Use at least 15 characters']);
     expect(passwordIssues('Blue-Harbor-2026')).toEqual([]);
+    expect(passwordIssues('correct sleepy otter window')).toEqual([]); // all lower-case words with spaces are fine
+    expect(passwordIssues('x'.repeat(129))).toContain('Use at most 128 characters');
+    expect(passwordIssues('\u00e9\u00e8\u00ea\u00eb\u00e0\u00e2 \u4e2d\u6587\u5b57\u7b26 quiet river')).toEqual([]); // Unicode and spaces allowed
+    expect(passwordIssues('🙂🌲🚀🎵🍎🌙🔥🐱🧩🎈🎲🦊🧭🍀🌊')).toEqual([]); // 15 distinct emoji = 15 characters (counted as code points)
+    expect(passwordIssues('🙂🌲🚀🎵🍎🌙🔥🐱🧩🎈')).toEqual(['Use at least 15 characters']);
   });
-  it('is enforced as a schema', () => {
-    expect(passwordRule.safeParse('Blue-Harbor-2026').success).toBe(true);
-    expect(passwordRule.safeParse('weak').success).toBe(false);
-    expect(passwordRule.safeParse('A'.repeat(129) + 'a1!').success).toBe(false);
+  it('rejects common passwords, trivial variations and obvious patterns', () => {
+    for (const bad of ['passwordpassword', 'Password1234567890', 'P@ssw0rdP@ssw0rd', 'qwertyuiopasdfghjkl', '1234567890123456', 'abcdefghijklmnop', 'aaaaaaaaaaaaaaaa', 'abababababababab',
+      'Correct Horse Battery Staple', 'iloveyouiloveyou1', 'welcome-welcome-welcome']) {
+      expect(passwordIssues(bad).length, bad).toBeGreaterThan(0);
+    }
+    expect(passwordIssues('Quiet-River-Maple-Lantern')).toEqual([]);
+  });
+  it('rejects passwords containing the username, name, email or product name', () => {
+    const ctx = { username: 'nurse.okafor', fullName: 'Nora Okafor', email: 'n.okafor@medicore.example.test' };
+    expect(passwordIssues('xx-nurse.okafor-xxxxxxxx', ctx)).toContain('Do not include your username, name, email address or the product name');
+    expect(passwordIssues('my-N0ra-is-here-today', ctx).length).toBeGreaterThan(0);
+    expect(passwordIssues('Okafor-forever-2026-yes', ctx).length).toBeGreaterThan(0);
+    expect(passwordIssues('Quiet-medicore-river-1', ctx).length).toBeGreaterThan(0);
+    expect(passwordIssues('Quiet-River-Maple-Lantern', ctx)).toEqual([]);
+    expect(checkPassword('Quiet-River-Maple-Lantern', ctx).every((c) => c.ok)).toBe(true);
+  });
+  it('grades strength consistently with the rules', () => {
+    expect(strengthOf('')).toBe('empty');
+    expect(strengthOf('short')).toBe('weak');
+    expect(strengthOf('passwordpassword')).toBe('weak');
+    expect(strengthOf('Blue-Harbor-2026')).toBe('fair');
+    expect(strengthOf('Quiet-River-Maple-Lantern-9')).toBe('strong');
+  });
+  it('is a transport-level bound as a schema; the policy itself is applied per account', () => {
+    expect(passwordRule.safeParse('anything goes here').success).toBe(true);
+    expect(passwordRule.safeParse('').success).toBe(false);
+    expect(passwordRule.safeParse('A'.repeat(300)).success).toBe(false);
   });
 });
 

@@ -2,10 +2,10 @@ import { Router, type Request, type Response } from 'express';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import type { Ctx } from '../middleware/context.js';
-import { audit, createSession, loadUser, requireAuth, sessionMeta, setSessionCookie, SESSION_COOKIE } from '../middleware/context.js';
+import { audit, createSession, loadUser, requireAuth, sessionCookieName, sessionMeta, setSessionCookie } from '../middleware/context.js';
 import { HttpError, parse } from '../utils/http.js';
-import { hashPassword, randomToken, sha256, verifyPassword } from '../utils/crypto.js';
-import { passwordRule } from '../utils/password.js';
+import { burnPasswordCheck, hashPassword, needsRehash, randomToken, safeEqual, sha256, verifyPassword } from '../utils/crypto.js';
+import { assertPasswordAllowed, passwordRule, setPassword } from '../utils/password.js';
 import { isVulnEnabled } from '../config/index.js';
 import { generateSecret, otpauthUri, verifyTotp } from '../services/totp.js';
 import { log } from '../utils/logger.js';
@@ -54,8 +54,8 @@ export function authRoutes({ db, cfg }: Ctx) {
       await audit(db, req, 'login_locked', 'user', u.id);
       throw new HttpError(429, 'Account temporarily locked. Try again later.');
     }
-    // Always run a hash comparison to keep timing similar for unknown users.
-    const ok = u && u.active && verifyPassword(password, u.password_hash);
+    // Always run exactly one hash comparison, so unknown or disabled accounts cost the same time as a wrong password.
+    const ok = u && u.active ? await verifyPassword(password, u.password_hash) : await burnPasswordCheck(password);
     if (!ok) {
       if (u) {
         const fails = u.failed_logins + 1;
@@ -68,6 +68,8 @@ export function authRoutes({ db, cfg }: Ctx) {
       throw new HttpError(401, 'Invalid username or password');
     }
     await db.query('UPDATE users SET failed_logins=0, locked_until=NULL WHERE id=$1', [u.id]);
+    // transparently move older hashes to the current work factor (OWASP: re-hash at the next successful sign-in)
+    if (needsRehash(u.password_hash)) await db.query('UPDATE users SET password_hash=$1 WHERE id=$2', [await hashPassword(password), u.id]);
 
     if (u.totp_enabled) {
       // Password accepted: a second factor is required before any session is issued.
@@ -120,7 +122,7 @@ export function authRoutes({ db, cfg }: Ctx) {
   r.post('/auth/logout', async (req, res) => {
     await audit(db, req, 'logout', 'user', req.user?.id ?? '');
     await db.query('DELETE FROM sessions WHERE id=$1', [req.sess.id]);
-    res.clearCookie(SESSION_COOKIE, { path: '/' });
+    res.clearCookie(sessionCookieName(cfg), { path: '/', secure: cfg.cookieSecure, httpOnly: true, sameSite: 'strict' });
     res.json({ ok: true });
   });
 
@@ -136,9 +138,12 @@ export function authRoutes({ db, cfg }: Ctx) {
   r.post('/profile/password', requireAuth, async (req, res) => {
     const b = parse(z.object({ current_password: z.string().min(1), new_password: passwordRule }), req.body);
     const { rows } = await db.query('SELECT password_hash FROM users WHERE id=$1', [req.user!.id]);
-    if (!verifyPassword(b.current_password, rows[0].password_hash)) throw new HttpError(400, 'Current password is incorrect');
-    if (b.new_password.toLowerCase().includes(req.user!.username.toLowerCase())) throw new HttpError(400, 'Password must not contain your username');
-    await db.query('UPDATE users SET password_hash=$1 WHERE id=$2', [hashPassword(b.new_password), req.user!.id]);
+    if (!(await verifyPassword(b.current_password, rows[0].password_hash))) {
+      await audit(db, req, 'password_change_failed', 'user', req.user!.id);
+      throw new HttpError(400, 'Current password is incorrect');
+    }
+    await assertPasswordAllowed(db, req.user!.id, b.new_password, { username: req.user!.username, fullName: req.user!.fullName, email: req.user!.email });
+    await setPassword(db, req.user!.id, await hashPassword(b.new_password));
     await db.query('DELETE FROM sessions WHERE user_id=$1 AND id <> $2', [req.user!.id, req.sess.id]);
     await audit(db, req, 'password_change', 'user', req.user!.id);
     res.json({ ok: true });
@@ -186,7 +191,7 @@ export function authRoutes({ db, cfg }: Ctx) {
     const b = parse(z.object({ password: z.string().min(1).max(128), code: z.string().min(6).max(20) }), req.body);
     if (!req.user!.totpEnabled) throw new HttpError(409, 'Two-factor authentication is not enabled');
     const { rows } = await db.query('SELECT password_hash FROM users WHERE id=$1', [req.user!.id]);
-    if (!verifyPassword(b.password, rows[0].password_hash)) throw new HttpError(400, 'Password is incorrect');
+    if (!(await verifyPassword(b.password, rows[0].password_hash))) throw new HttpError(400, 'Password is incorrect');
     if (!(await verifySecondFactor(req.user!.id, b.code))) throw new HttpError(400, 'Invalid verification code');
     await db.query('UPDATE users SET totp_enabled=false, totp_secret=NULL, totp_last_step=NULL WHERE id=$1', [req.user!.id]);
     await db.query('DELETE FROM recovery_codes WHERE user_id=$1', [req.user!.id]);
@@ -198,7 +203,7 @@ export function authRoutes({ db, cfg }: Ctx) {
     const b = parse(z.object({ password: z.string().min(1).max(128), code: z.string().min(6).max(20) }), req.body);
     if (!req.user!.totpEnabled) throw new HttpError(409, 'Two-factor authentication is not enabled');
     const { rows } = await db.query('SELECT password_hash FROM users WHERE id=$1', [req.user!.id]);
-    if (!verifyPassword(b.password, rows[0].password_hash)) throw new HttpError(400, 'Password is incorrect');
+    if (!(await verifyPassword(b.password, rows[0].password_hash))) throw new HttpError(400, 'Password is incorrect');
     if (!(await verifySecondFactor(req.user!.id, b.code))) throw new HttpError(400, 'Invalid verification code');
     await audit(db, req, '2fa_recovery_regenerated', 'user', req.user!.id);
     res.json({ recoveryCodes: await issueRecoveryCodes(req.user!.id) });
@@ -254,12 +259,16 @@ export function authRoutes({ db, cfg }: Ctx) {
       await db.query('UPDATE reset_tokens SET used=true WHERE id=$1', [t.id]);
       throw new HttpError(429, 'Too many attempts. Request a new code.');
     }
-    if (t.token !== b.token) {
+    if (!safeEqual(t.token, b.token)) {
       await db.query('UPDATE reset_tokens SET attempts=attempts+1 WHERE id=$1', [t.id]);
       throw new HttpError(400, 'Invalid or expired reset code');
     }
+    // the code is right: now hold the new password to the policy (the code stays usable if it is rejected)
+    const acct = (await db.query<{ username: string; full_name: string; email: string }>('SELECT username, full_name, email FROM users WHERE id=$1', [t.uid])).rows[0];
+    await assertPasswordAllowed(db, t.uid, b.new_password, { username: acct.username, fullName: acct.full_name, email: acct.email });
     await db.query('UPDATE reset_tokens SET used=true WHERE id=$1', [t.id]);
-    await db.query('UPDATE users SET password_hash=$1, failed_logins=0, locked_until=NULL WHERE id=$2', [hashPassword(b.new_password), t.uid]);
+    await setPassword(db, t.uid, await hashPassword(b.new_password));
+    await db.query('UPDATE users SET failed_logins=0, locked_until=NULL WHERE id=$1', [t.uid]);
     await db.query('DELETE FROM sessions WHERE user_id=$1', [t.uid]);
     await audit(db, req, 'password_reset_completed', 'user', t.uid);
     res.json({ ok: true });

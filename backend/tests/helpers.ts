@@ -13,7 +13,8 @@ export interface Lab { app: ReturnType<typeof createApp>; db: Db; cfg: AppConfig
 export async function makeLab(labMode: LabMode, extra: Partial<AppConfig> = {}): Promise<Lab> {
   configureLogger('error', true);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'medicore-test-'));
-  const cfg: AppConfig = { ...loadConfig({}), labMode, uploadDir: path.join(tmp, 'uploads'), evidenceDir: path.join(tmp, 'evidence'), reportDir: path.join(tmp, 'reports'), ...extra };
+  const base = loadConfig({});
+  const cfg: AppConfig = { ...base, rateLimit: { ...base.rateLimit, authMax: 100_000, apiMax: 1_000_000 }, labMode, uploadDir: path.join(tmp, 'uploads'), evidenceDir: path.join(tmp, 'evidence'), reportDir: path.join(tmp, 'reports'), ...extra };
   const db = await connect(cfg, true);
   await migrate(db);
   await seedAll(db, cfg);

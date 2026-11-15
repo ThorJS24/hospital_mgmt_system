@@ -9,6 +9,7 @@ services:
       POSTGRES_DB: medicore
       POSTGRES_USER: medicore_app
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-medicore_lab_only_change_me}
+    security_opt: ["no-new-privileges:true"]
     volumes:
       - medicore_pg:/var/lib/postgresql/data
     healthcheck:
@@ -21,6 +22,10 @@ services:
   backend:
     build: .
     command: npm run start -w backend
+    # least privilege: no extra capabilities, no privilege escalation, bounded process count
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 512
     environment:
       HOST: 0.0.0.0
       PORT: "4000"
@@ -46,6 +51,9 @@ services:
   frontend:
     build: .
     command: npm run dev -w frontend
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    pids_limit: 512
     environment:
       VITE_HOST: 0.0.0.0
       VITE_API_TARGET: http://backend:4000

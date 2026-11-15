@@ -20,7 +20,7 @@ export default defineConfig({
     {
       command: 'npm run start -w backend',
       url: 'http://127.0.0.1:4000/api/health',
-      env: { LAB_MODE: 'vulnerable', HOST: '127.0.0.1', PORT: '4000', PGLITE_DIR: dbDir, LOG_LEVEL: 'warn', LIVE_SIM: '0' },
+      env: { LAB_MODE: 'vulnerable', HOST: '127.0.0.1', PORT: '4000', PGLITE_DIR: dbDir, LOG_LEVEL: 'warn', LIVE_SIM: '0', RATE_LIMIT_AUTH_MAX: '10000', RATE_LIMIT_API_MAX: '100000' },
       reuseExistingServer: false,
       timeout: 120_000,
     },

@@ -63,6 +63,7 @@ export function consultationRoutes({ db }: Ctx) {
   r.get('/consultations/:id', requirePermission('consultations.read'), async (req, res) => {
     const id = intParam(req.params.id);
     const c = await load(req, id);
+    await audit(db, req, 'consultation_view', 'consultation', id);
     const [diagnoses, labs, rx, allergies] = await Promise.all([
       db.query('SELECT d.icd_code AS code, i.description, d.is_primary FROM consultation_diagnoses d JOIN icd10_codes i ON i.code=d.icd_code WHERE d.consultation_id=$1 ORDER BY d.is_primary DESC, d.icd_code', [id]),
       db.query(`SELECT lr.id, lr.status, t.name AS test, t.code FROM laboratory_requests lr JOIN laboratory_tests t ON t.id=lr.test_id WHERE lr.consultation_id=$1 ORDER BY lr.id`, [id]),

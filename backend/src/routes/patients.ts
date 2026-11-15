@@ -47,7 +47,10 @@ export function patientRoutes({ db, cfg }: Ctx) {
   });
 
   r.get('/patients/:id', requirePermission('patients.read_all', 'patients.read_scoped'), async (req, res) => {
-    res.json(await getPatient(db, req.user!, intParam(req.params.id)));
+    const id = intParam(req.params.id);
+    const record = await getPatient(db, req.user!, id);
+    await audit(db, req, 'patient_view', 'patient', id);
+    res.json(record);
   });
 
   r.patch('/patients/:id', requirePermission('patients.write'), async (req, res) => {
@@ -114,6 +117,7 @@ export function patientRoutes({ db, cfg }: Ctx) {
   r.get('/documents/:id', requirePermission('documents.manage'), async (req, res) => {
     const d = (await db.query('SELECT * FROM patient_documents WHERE id=$1', [intParam(req.params.id)])).rows[0];
     if (!d || !(await canAccessPatient(db, req.user!, d.patient_id))) throw new HttpError(404, 'Document not found');
+    await audit(db, req, 'document_view', 'patient', d.patient_id, `document=${d.id}`);
     res.setHeader('Content-Type', d.content_type);
     res.setHeader('Content-Disposition', `attachment; filename="${d.filename.replace(/"/g, '')}"`);
     res.send(fs.readFileSync(path.join(cfg.uploadDir, d.stored_name)));

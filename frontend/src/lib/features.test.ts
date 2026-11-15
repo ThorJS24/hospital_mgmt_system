@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DICTIONARIES, LANGS, isLang, translate } from './i18n';
-import { characterClasses, passwordAcceptable, passwordChecks, passwordStrength } from './password';
+import { passwordAcceptable, passwordChecks, passwordStrength } from './password';
 import { describeAgent } from './agent';
 import { ALL_NAV, NAV_GROUPS, firstAllowedRoute } from './nav';
 import { fmtDate, fmtDateTime, money } from './api';
@@ -61,22 +61,24 @@ describe('navigation model', () => {
 });
 
 describe('password hints', () => {
-  it('mirrors the server rules', () => {
-    expect(characterClasses('Abc1!')).toBe(4);
+  it('mirror the server policy: long, no composition rules, no common or personal passwords', () => {
     expect(passwordAcceptable('Blue-Harbor-2026')).toBe(true);
+    expect(passwordAcceptable('all lower case words are fine here')).toBe(true);
     expect(passwordAcceptable('short1A!')).toBe(false);
-    expect(passwordAcceptable('alllowercaseletters')).toBe(false);
-    expect(passwordAcceptable('Doctor.Svensson-2026', 'doctor.svensson')).toBe(false);
-    expect(passwordAcceptable('MyPassword123!')).toBe(false);
-    expect(passwordChecks('', 'x').every((c) => !c.ok || c.id === 'username' || c.id === 'common')).toBe(true);
+    expect(passwordAcceptable('passwordpassword')).toBe(false);
+    expect(passwordAcceptable('qwertyuiopasdfghjkl')).toBe(false);
+    expect(passwordAcceptable('Doctor.Svensson-2026', { username: 'doctor.svensson' })).toBe(false);
+    expect(passwordAcceptable('Quiet-River-Maple-Lantern', { username: 'doctor.svensson' })).toBe(true);
+    expect(passwordChecks('', {}).map((c) => c.id)).toEqual(['length', 'common', 'pattern', 'personal']);
+    expect(passwordChecks('short', {}).find((c) => c.id === 'length')?.ok).toBe(false);
   });
-  it('grades strength', () => {
-    expect(passwordStrength('').level).toBe('empty');
-    expect(passwordStrength('abc').level).toBe('weak');
-    expect(passwordStrength('Bluebird2026x').level).toBe('fair');
-    expect(passwordStrength('Blue-Harbor-2026').level).toBe('strong');
-    expect(passwordStrength('Blue-Harbor-Quartz-2026!').level).toBe('strong');
-    expect(passwordStrength('abcdefghijkl').level).toBe('weak');
+  it('grades strength without contradicting the checklist', () => {
+    expect(passwordStrength('')).toBe('empty');
+    expect(passwordStrength('abc')).toBe('weak');
+    expect(passwordStrength('abcdefghijkl')).toBe('weak');
+    expect(passwordStrength('passwordpassword')).toBe('weak');
+    expect(passwordStrength('Blue-Harbor-2026')).toBe('fair');
+    expect(passwordStrength('Quiet-River-Maple-Lantern-9')).toBe('strong');
   });
 });
 

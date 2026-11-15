@@ -5,7 +5,7 @@ import { audit, requirePermission } from '../middleware/context.js';
 import { HttpError, intParam, pageQuery, parse } from '../utils/http.js';
 import { hashPassword } from '../utils/crypto.js';
 import { ROLES } from '../services/permissions.js';
-import { passwordRule } from '../utils/password.js';
+import { assertPasswordAllowed, passwordRule } from '../utils/password.js';
 import { runMaintenance } from '../services/maintenance.js';
 
 /** Ordinary hospital administrators must not create, promote or demote assessors (assessment administration is separate). */
@@ -39,9 +39,9 @@ export function adminRoutes({ db }: Ctx) {
     } else if (b.patient_id) {
       throw new HttpError(400, 'Only patient accounts can be linked to a patient record');
     }
-    if (b.password.toLowerCase().includes(b.username.toLowerCase())) throw new HttpError(400, 'Password must not contain the username');
+    await assertPasswordAllowed(db, null, b.password, { username: b.username, fullName: b.full_name, email: b.email });
     if ((await db.query('SELECT 1 FROM users WHERE username=$1', [b.username])).rows.length) throw new HttpError(409, 'Username already exists');
-    const { rows } = await db.query('INSERT INTO users(username,email,full_name,password_hash,role_id,staff_id,patient_id) SELECT $1,$2,$3,$4,r.id,$5,$7 FROM roles r WHERE r.code=$6 RETURNING id', [b.username, b.email, b.full_name, hashPassword(b.password), b.staff_id ?? null, b.role, b.patient_id ?? null]);
+    const { rows } = await db.query('INSERT INTO users(username,email,full_name,password_hash,role_id,staff_id,patient_id,must_change_password) SELECT $1,$2,$3,$4,r.id,$5,$7,true FROM roles r WHERE r.code=$6 RETURNING id', [b.username, b.email, b.full_name, await hashPassword(b.password), b.staff_id ?? null, b.role, b.patient_id ?? null]);
     await audit(db, req, 'user_create', 'user', rows[0].id, `role=${b.role}`);
     res.status(201).json({ id: rows[0].id });
   });

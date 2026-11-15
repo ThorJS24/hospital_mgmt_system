@@ -25,7 +25,7 @@ const naive = (d: Date) => `${ymd(d)}T${pad(d.getHours())}:${pad(d.getMinutes())
  * Synthetic data for the clinical-workflow, operations and patient-portal features
  * (consultations, MAR, triage, inventory, rosters, claims, notifications). Runs after the core dataset.
  */
-export async function seedExtended(db: Db, accounts: readonly TestAccount[]): Promise<void> {
+export async function seedExtended(db: Db, accounts: readonly TestAccount[], mustChangePassword = false): Promise<void> {
   const r = rng(20260202);
   const pick = <T,>(a: readonly T[]) => a[Math.floor(r() * a.length)];
   const now = new Date();
@@ -40,8 +40,8 @@ export async function seedExtended(db: Db, accounts: readonly TestAccount[]): Pr
   for (const a of accounts.filter((x) => x.role === 'patient' && x.patientId)) {
     await db.query("UPDATE patients SET status='Active' WHERE id=$1", [a.patientId]);
     const p = await one<{ first_name: string; last_name: string; email: string }>('SELECT first_name, last_name, email FROM patients WHERE id=$1', [a.patientId]);
-    await db.query('INSERT INTO users(username,email,full_name,password_hash,role_id,patient_id) SELECT $1,$2,$3,$4,r.id,$5 FROM roles r WHERE r.code=$6',
-      [a.username, p.email, `${p.first_name} ${p.last_name}`, hashPassword(a.password), a.patientId, a.role]);
+    await db.query('INSERT INTO users(username,email,full_name,password_hash,role_id,patient_id,must_change_password) SELECT $1,$2,$3,$4,r.id,$5,$7 FROM roles r WHERE r.code=$6',
+      [a.username, p.email, `${p.first_name} ${p.last_name}`, await hashPassword(a.password), a.patientId, a.role, mustChangePassword]);
   }
 
   // ---------- suppliers, inventory and prescribing reference data ----------

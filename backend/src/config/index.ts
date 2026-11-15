@@ -23,7 +23,23 @@ export interface AppConfig {
   manifestPath: string;
   logLevel: 'debug' | 'info' | 'warn' | 'error';
   corsOrigin: string;
+  /** NODE_ENV=production */
+  production: boolean;
+  /** Mark the session cookie Secure and use the __Host- prefix (set COOKIE_SECURE=1 whenever the site is served over HTTPS). Default: on in production. */
+  cookieSecure: boolean;
+  /** Express "trust proxy" setting (e.g. "1" behind one reverse proxy) so req.ip and the protocol come from X-Forwarded-*. null = do not trust. */
+  trustProxy: string | null;
+  /** Hard upper limit on a session's life regardless of activity. */
+  sessionAbsoluteHours: number;
+  /** Extra origins allowed to make state-changing requests (the request's own host is always allowed). */
+  allowedOrigins: string[];
+  /** Serve the built front end (frontend/dist) from this process with a strict CSP. */
+  serveFrontend: boolean;
+  frontendDir: string;
+  rateLimit: { authMax: number; authWindowMs: number; apiMax: number; apiWindowMs: number };
 }
+
+const positive = (v: string | undefined, fallback: number) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : fallback; };
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const labMode: LabMode = env.LAB_MODE === 'vulnerable' ? 'vulnerable' : 'secure';
@@ -43,6 +59,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     manifestPath: path.join(ROOT, 'assessment', 'manifest', 'vulnerabilities.json'),
     logLevel: (env.LOG_LEVEL as AppConfig['logLevel']) ?? 'info',
     corsOrigin: env.CORS_ORIGIN ?? 'http://127.0.0.1:5173',
+    production: env.NODE_ENV === 'production',
+    cookieSecure: env.COOKIE_SECURE ? env.COOKIE_SECURE === '1' : env.NODE_ENV === 'production',
+    trustProxy: env.TRUST_PROXY || null,
+    sessionAbsoluteHours: positive(env.SESSION_ABSOLUTE_HOURS, 12),
+    allowedOrigins: (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+    serveFrontend: env.SERVE_FRONTEND === '1',
+    frontendDir: path.join(ROOT, 'frontend', 'dist'),
+    rateLimit: {
+      authMax: positive(env.RATE_LIMIT_AUTH_MAX, 20), authWindowMs: positive(env.RATE_LIMIT_AUTH_WINDOW_MIN, 15) * 60_000,
+      apiMax: positive(env.RATE_LIMIT_API_MAX, 600), apiWindowMs: 60_000,
+    },
   };
 }
 

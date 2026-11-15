@@ -1,8 +1,11 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import express, { type ErrorRequestHandler } from 'express';
 import cookieParser from 'cookie-parser';
 import type { Db } from './db/index.js';
 import { type AppConfig } from './config/index.js';
-import { context, csrfGuard, securityHeaders } from './middleware/context.js';
+import { context, csrfGuard, passwordChangeGate, securityHeaders } from './middleware/context.js';
+import { createRateLimiter } from './middleware/rateLimit.js';
 import { HttpError } from './utils/http.js';
 import { log } from './utils/logger.js';
 import { authRoutes } from './routes/auth.js';
@@ -31,9 +34,8 @@ import { vulnerableRoutes } from './assessment/vulnerable/routes.js';
 export function createApp(db: Db, cfg: AppConfig) {
   const app = express();
   app.disable('x-powered-by');
-  app.use(express.json({ limit: '3mb' }));
-  app.use(cookieParser());
-  app.use(securityHeaders);
+  if (cfg.trustProxy) app.set('trust proxy', /^\d+$/.test(cfg.trustProxy) ? Number(cfg.trustProxy) : cfg.trustProxy);
+  app.use(securityHeaders(cfg));
 
   // Health check: no session, no data.
   app.get('/api/health', async (_req, res) => {
@@ -45,10 +47,20 @@ export function createApp(db: Db, cfg: AppConfig) {
     }
   });
 
+  // Throttle before any body parsing, session lookup or password hashing: a general per-client limit, and a much
+  // tighter one on the endpoints that check secrets (sign-in, second factor, password reset).
+  const apiLimiter = createRateLimiter({ name: 'api', max: cfg.rateLimit.apiMax, windowMs: cfg.rateLimit.apiWindowMs });
+  const authLimiter = createRateLimiter({ name: 'auth', max: cfg.rateLimit.authMax, windowMs: cfg.rateLimit.authWindowMs });
+
   const ctx = { db, cfg };
   const api = express.Router();
+  api.use(apiLimiter);
+  api.use(['/auth/login', '/auth/login/2fa', '/auth/password-reset/request', '/auth/password-reset/confirm'], authLimiter);
+  api.use(express.json({ limit: '3mb' }));
+  api.use(cookieParser());
   api.use(context(ctx));
-  api.use(csrfGuard);
+  api.use(csrfGuard(cfg));
+  api.use(passwordChangeGate);
   const auth = authRoutes(ctx);
   api.use(auth);
   const routers = [patientRoutes, appointmentRoutes, inpatientRoutes, orgRoutes, laboratoryRoutes, pharmacyRoutes, billingRoutes, dashboardRoutes, adminRoutes, assessmentRoutes, liveRoutes,
@@ -60,6 +72,18 @@ export function createApp(db: Db, cfg: AppConfig) {
   if (cfg.labMode === 'vulnerable') api.use('/lab', vulnerableRoutes(ctx));
   api.use((_req, _res, next) => next(new HttpError(404, 'Not found')));
   app.use('/api', api);
+
+  // Optional: serve the built front end from this process (SERVE_FRONTEND=1) with a strict Content-Security-Policy.
+  if (cfg.serveFrontend && fs.existsSync(path.join(cfg.frontendDir, 'index.html'))) {
+    const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; " +
+      "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+    app.use((req, res, next) => { if (!req.path.startsWith('/api')) { res.setHeader('Content-Security-Policy', csp); res.setHeader('Cache-Control', 'no-cache'); } next(); });
+    app.use(express.static(cfg.frontendDir, {
+      index: false, dotfiles: 'ignore',
+      setHeaders: (res, file) => { if (file.includes(`${path.sep}assets${path.sep}`)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); },
+    }));
+    app.use((req, res, next) => ((req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/api') ? res.sendFile(path.join(cfg.frontendDir, 'index.html')) : next()));
+  }
 
   const onError: ErrorRequestHandler = (err, req, res, _next) => {
     if (err instanceof HttpError) {

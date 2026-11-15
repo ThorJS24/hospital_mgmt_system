@@ -182,13 +182,13 @@ describe('password policy', () => {
   it('rejects weak or personal passwords on change and on reset, and accepts a strong one', async () => {
     const c = await as(lab, 'doctor.svensson');
     const change = (p: string) => c.post('/api/profile/password', { current_password: passwordOf('doctor.svensson'), new_password: p });
-    for (const weak of ['short1A!', 'alllowercaseletters', 'ALLUPPERCASELETTERS', '1234567890123', 'Doctor.Svensson-2026', 'Welcome-Home-1']) {
+    for (const weak of ['short1A!', 'passwordpassword', 'qwertyuiopasdfghjkl', '1234567890123456', 'Doctor.Svensson-2026', 'Ingrid-Svensson-forever', 'iloveyouiloveyou']) {
       const r = await change(weak);
       expect(r.status, weak).toBe(400);
     }
-    const detail = (await change('alllowercaseletters')).body.details;
-    expect(detail[0].message).toMatch(/three of/);
-    expect((await change('Blue-Harbor-2026')).status).toBe(200);
+    const detail = (await change('short1A!')).body.details;
+    expect(detail[0]).toMatchObject({ field: 'new_password', message: 'Use at least 15 characters' });
+    expect((await change('all lower case words are fine here')).status).toBe(200); // no composition rules
 
     const anon = request.agent(lab.app);
     const s = await anon.get('/api/auth/session');
@@ -196,7 +196,8 @@ describe('password policy', () => {
     const token = (await q("SELECT token FROM reset_tokens WHERE user_id=(SELECT id FROM users WHERE username='doctor.svensson') AND NOT used ORDER BY id DESC LIMIT 1"))[0].token;
     const reset = (pw: string) => anon.post('/api/auth/password-reset/confirm').set('x-csrf-token', s.body.csrfToken).send({ username: 'doctor.svensson', token, new_password: pw });
     expect((await reset('weak')).status).toBe(400);
-    expect((await reset('Green-Meadow-2027')).status).toBe(200);
+    expect((await reset('all lower case words are fine here')).status).toBe(400); // used a moment ago: history applies to resets too
+    expect((await reset('Green-Meadow-2027')).status).toBe(200); // the code survived the rejected attempts
     const login = new Client(lab);
     expect((await login.login('doctor.svensson', 'Green-Meadow-2027')).status).toBe(200);
   });

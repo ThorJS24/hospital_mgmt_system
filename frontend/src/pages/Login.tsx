@@ -85,7 +85,7 @@ export default function Login() {
             {mode === 'confirm' && <>
               <TextField label="Reset code" required value={f.token} onChange={set('token')} hint="Delivered to the local synthetic outbox (Administration → Local outbox)." error={fe.token} />
               <TextField label="New password" type="password" required autoComplete="new-password" value={f.newPassword} onChange={set('newPassword')} error={fe.new_password} />
-              <PasswordStrength value={f.newPassword} username={f.username.trim()} />
+              <PasswordStrength value={f.newPassword} context={{ username: f.username.trim() }} />
             </>}
             <Button type="submit" loading={busy} className="w-full py-2.5">{submitLabel}</Button>
             <div className="text-center text-sm">

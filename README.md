@@ -26,7 +26,7 @@ All people, records, SSNs, insurance numbers and card numbers are **fabricated**
   - *Billing extras:* refunds against specific payments, insurance claims with a four-eyes approval rule, payment history and PDF invoices.
   - *Reports:* bed occupancy, wait times, collections, aging and claims, with CSV (formula-injection safe) and PDF export.
 - **Patient portal:** a `patient` role that can see only its own appointments, approved results, prescriptions and bills, update contact details and book or cancel appointments online. Appointment reminders and confirmations are written to a local outbox (nothing is sent).
-- **Account security:** TOTP two-step verification with recovery codes (RFC 6238, no extra dependencies), an active-sessions page with "sign out other devices", password strength hints and server-side password rules.
+- **Account security:** passwords follow NIST SP 800-63B-4 / OWASP (15+ characters, no composition rules, common-password and pattern screening, no reuse of the last 5, hashed with scrypt that is upgraded at sign-in); new accounts must choose their own password first; TOTP two-step verification with recovery codes; an active-sessions page with "sign out other devices"; rate limiting; CSRF checks on Origin and Fetch Metadata; an append-only audit trail that also records who viewed which record. See [SECURITY.md](SECURITY.md).
 - **Platform:** onboarding tour, keyboard shortcuts (`?` for the list), illustrated empty states, English, Spanish and Hindi interface text, a generated OpenAPI reference (`/api/docs`, administrators), and CI.
 - **UI:** clinical design system, light/dark theme, responsive tables, accessible dialogs/forms, portraits and hospital photography (bundled locally).
 - **Assessment area (assessor only):** test-case register, findings with status workflow, evidence with SHA-256 and secret redaction, separate coverage metrics, CSV/JSON/HTML export.
@@ -73,6 +73,8 @@ All published ports bind to `127.0.0.1`; the database publishes no port. The ima
 | assessor.vance | LabAssess#2026 | Security assessor | Assessment area |
 | patient.portal | LabPatient#2026 | Patient (portal account for SYN-000005) | The patient portal |
 
+The development passwords above are published and shorter than the 15-character policy, so they exist only because the seed and `db:reset-passwords` set them directly; any password you choose yourself must meet the policy.
+
 ### Locked out, or the password was changed?
 Restore the documented passwords without losing any data (this also clears lockouts, two-step verification and open sessions, and re-activates the account):
 ```bash
@@ -94,7 +96,7 @@ Password-reset codes for the in-app "Forgot password?" flow are delivered to Adm
 | Tests | `npm test` (API and unit tests) · `npm run test:e2e` (Playwright browser tests) |
 | API reference | sign in as an administrator, then open `/api/docs` (JSON at `/api/openapi.json`) |
 
-Environment variables are listed in `.env.example` (`LAB_MODE`, `LAB_VULNS`, `HOST`, `PORT`, `DATABASE_URL`, `LIVE_SIM`, …). With no `DATABASE_URL` the database lives in `./.pglite`.
+Environment variables are listed in `.env.example` (`LAB_MODE`, `LAB_VULNS`, `HOST`, `PORT`, `DATABASE_URL`, `LIVE_SIM`, and the security settings `COOKIE_SECURE`, `TRUST_PROXY`, `SERVE_FRONTEND`, `ALLOWED_ORIGINS`, `SESSION_ABSOLUTE_HOURS`, `RATE_LIMIT_*`). With no `DATABASE_URL` the database lives in `./.pglite`.
 
 ## Intended weaknesses
 Five scenarios remain, isolated in `backend/src/assessment/vulnerable/` (and the login handler for HMS-V18), enabled only with `LAB_MODE=vulnerable` and individually switchable with `LAB_VULNS=HMS-V03,HMS-V14,…`:
@@ -122,6 +124,13 @@ frontend/    React app: pages/, components/ (ui, Layout, Avatar, vulnerable/LabT
 assessment/  manifest (internal), evidence & report output dirs (git-ignored contents)
 lab-data/    synthetic files for the path-handling scenario
 ```
+
+## Running it for real (secure mode, production build)
+```bash
+npm run build -w frontend
+SERVE_FRONTEND=1 NODE_ENV=production COOKIE_SECURE=1 TRUST_PROXY=1 npm start -w backend   # behind an HTTPS reverse proxy or tunnel
+```
+On first start the demo accounts are created with random one-time passwords, printed once in the console, that must be changed at first sign-in; the server refuses to start in production if any account still has a published development password, or in lab mode. The checklist and the list of known gaps are in [SECURITY.md](SECURITY.md).
 
 ## Quality gates
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push and pull request: lint, typecheck, the API and unit tests (embedded PostgreSQL), a production build, a dependency audit, the Playwright browser tests, and a Docker job that builds the images and checks that both secure and lab modes start healthy and behave as documented (lab routes are 404 in secure mode).

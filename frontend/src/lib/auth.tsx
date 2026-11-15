@@ -3,7 +3,7 @@ import { get, post, setCsrf } from './api';
 
 export interface User {
   id: number; username: string; fullName: string; email: string; role: string; roleName: string;
-  staffId: number | null; departmentId: number | null; patientId: number | null; totpEnabled: boolean; permissions: string[];
+  staffId: number | null; departmentId: number | null; patientId: number | null; totpEnabled: boolean; mustChangePassword: boolean; permissions: string[];
 }
 interface LabInfo { mode: 'secure' | 'vulnerable'; banner: string }
 interface AuthState {

@@ -33,8 +33,8 @@ export default function Profile() {
         <Card title="Change password"><form onSubmit={change} className="space-y-3" noValidate>{e2 && <Alert>{e2}</Alert>}
           <TextField label="Current password" type="password" autoComplete="current-password" required value={pw.current_password} onChange={(e) => setPw({ ...pw, current_password: e.target.value })} />
           <TextField label="New password" type="password" autoComplete="new-password" required value={pw.new_password} onChange={(e) => setPw({ ...pw, new_password: e.target.value })} error={fe.new_password} />
-          <PasswordStrength value={pw.new_password} username={user?.username} />
-          <Button type="submit" loading={b2} disabled={!pw.current_password || !passwordAcceptable(pw.new_password, user?.username)}>Change password</Button></form></Card>
+          <PasswordStrength value={pw.new_password} context={{ username: user?.username, fullName: user?.fullName, email: user?.email }} />
+          <Button type="submit" loading={b2} disabled={!pw.current_password || !passwordAcceptable(pw.new_password, { username: user?.username, fullName: user?.fullName, email: user?.email })}>Change password</Button></form></Card>
         <TwoFactor />
         <Sessions />
       </div>

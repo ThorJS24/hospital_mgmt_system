@@ -186,8 +186,13 @@ describe('patient accounts', () => {
     expect((await admin.patch(`/api/admin/users/${portalUser}`, { active: true })).status).toBe(200);
     const ok = await admin.post('/api/admin/users', { ...base, role: 'patient', patient_id: 7 });
     expect(ok.status).toBe(201);
+    // an administrator-created account is on a temporary password: nothing works until the user chooses their own
     const c = new Client(lab);
-    expect((await c.login('new.portal', 'Blue-Harbor-2026')).status).toBe(200);
+    const first = await c.login('new.portal', 'Blue-Harbor-2026');
+    expect(first.status).toBe(200);
+    expect(first.body.user.mustChangePassword).toBe(true);
+    expect((await c.get('/api/portal/me')).status).toBe(403);
+    expect((await c.post('/api/profile/password', { current_password: 'Blue-Harbor-2026', new_password: 'Granite-Falcon-Orchard-88' })).status).toBe(200);
     expect((await c.get('/api/portal/me')).body.patient.id).toBe(7);
   });
 });

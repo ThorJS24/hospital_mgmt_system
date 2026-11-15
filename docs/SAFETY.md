@@ -38,3 +38,11 @@ Run `npm run start:secure` (or `docker compose up` without the lab override). Ev
 - Reminders and confirmations are written to a local table; the application still makes no outbound HTTP, SMTP or SMS calls.
 - API reference pages are administrator-only and served with a strict Content-Security-Policy (`script-src 'self'`).
 - The five intentionally remaining weaknesses (HMS-V03, V10, V14, V17, V18) are unchanged and only exist in lab mode.
+
+## Hardening pass (secure mode)
+The full control list, deployment checklist and known gaps are in [SECURITY.md](../SECURITY.md). Highlights beyond the earlier sections:
+- Passwords: 15+ characters with no composition rules, common-password and pattern screening, personal-data check, last-5 reuse block, scrypt (N=2^16, r=8, p=2) with the work factor stored in the hash and an upgrade at the next sign-in; unknown, disabled and wrong-password sign-ins take the same time and give the same answer.
+- Provisioning: administrator-created accounts and first-run production accounts must change the temporary password before any other call is allowed (`403 PASSWORD_CHANGE_REQUIRED`).
+- Requests: per-client rate limits ahead of all other processing; `Origin` and `Sec-Fetch-Site` checks in addition to the CSRF token; `SameSite=Strict` cookies, `Secure` + `__Host-` prefix over HTTPS; HSTS; a 12-hour absolute session limit.
+- Accountability: the audit table is append-only (database trigger) and records the client address; views of patient records, documents and consultations are audited.
+- Delivery: containers run as a non-root user with capabilities dropped; Dependabot and CodeQL are configured.

@@ -1,22 +1,38 @@
 import { z } from 'zod';
+import type { Db } from '../db/index.js';
+import { HttpError } from './http.js';
+import { verifyPassword } from './crypto.js';
+import { HISTORY_DEPTH, MAX_LENGTH, passwordIssues, type PolicyContext } from '../../../shared/passwordPolicy.js';
 
-/** Number of character classes (lower, upper, digit, symbol) present in a password. */
-export const characterClasses = (pw: string) =>
-  [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((re) => re.test(pw)).length;
+export { passwordIssues, passwordAcceptable, checkPassword, MIN_LENGTH, MAX_LENGTH } from '../../../shared/passwordPolicy.js';
 
-const COMMON = ['password', 'qwerty', 'letmein', '123456', 'welcome'];
+/** Transport-level bound only; the real policy is applied by assertPasswordAllowed (it needs the account context and history). */
+export const passwordRule = z.string().min(1).max(MAX_LENGTH + 64, 'Password is too long');
 
-/** Human-readable problems with a candidate password (empty array = acceptable). Mirrors the UI strength hints. */
-export function passwordIssues(pw: string, username = ''): string[] {
-  const issues: string[] = [];
-  if (pw.length < 10) issues.push('Use at least 10 characters');
-  if (characterClasses(pw) < 3) issues.push('Mix at least three of: lowercase, uppercase, digits, symbols');
-  const low = pw.toLowerCase();
-  if (username && username.length >= 3 && low.includes(username.toLowerCase())) issues.push('Must not contain your username');
-  if (COMMON.some((c) => low.includes(c))) issues.push('Avoid common words such as "password" or "admin"');
-  return issues;
+const fieldError = (message: string) => new HttpError(400, 'Validation failed', [{ field: 'new_password', message }]);
+
+/**
+ * Enforces the full policy for a new password: length, common/pattern screening, personal data, not the current
+ * password and not one of the last few used. Throws 400 with a field error so forms can show it next to the input.
+ */
+export async function assertPasswordAllowed(db: Db, userId: number | null, pw: string, ctx: PolicyContext): Promise<void> {
+  const issues = passwordIssues(pw, ctx);
+  if (issues.length) throw fieldError(issues[0]);
+  if (userId !== null) {
+    const hashes = [
+      ...(await db.query<{ password_hash: string }>('SELECT password_hash FROM users WHERE id=$1', [userId])).rows.map((r) => r.password_hash),
+      ...(await db.query<{ password_hash: string }>('SELECT password_hash FROM password_history WHERE user_id=$1 ORDER BY id DESC LIMIT $2', [userId, HISTORY_DEPTH])).rows.map((r) => r.password_hash),
+    ];
+    for (const h of hashes) if (await verifyPassword(pw, h)) throw fieldError(`Choose a password you have not used recently (the last ${HISTORY_DEPTH} are remembered)`);
+  }
 }
 
-export const passwordRule = z.string().max(128).superRefine((pw, ctx) => {
-  for (const message of passwordIssues(pw)) ctx.addIssue({ code: 'custom', message });
-});
+/** Stores the new hash, remembers the old one for the reuse check, clears the must-change flag and trims the history. */
+export async function setPassword(db: Db, userId: number, newHash: string): Promise<void> {
+  await db.tx(async (t) => {
+    const old = (await t.query<{ password_hash: string }>('SELECT password_hash FROM users WHERE id=$1 FOR UPDATE', [userId])).rows[0];
+    if (old) await t.query('INSERT INTO password_history(user_id,password_hash) VALUES ($1,$2)', [userId, old.password_hash]);
+    await t.query('UPDATE users SET password_hash=$2, must_change_password=false, password_changed_at=now() WHERE id=$1', [userId, newHash]);
+    await t.query('DELETE FROM password_history WHERE user_id=$1 AND id NOT IN (SELECT id FROM password_history WHERE user_id=$1 ORDER BY id DESC LIMIT $2)', [userId, HISTORY_DEPTH]);
+  });
+}

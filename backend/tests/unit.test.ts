@@ -105,11 +105,12 @@ describe('lab containment', () => {
 });
 
 describe('passwords', () => {
-  it('hashes with salt and verifies', () => {
-    const h = hashPassword('LabPass#1234');
+  it('hashes with salt and verifies', async () => {
+    const h = await hashPassword('LabPass#1234');
     expect(h).not.toContain('LabPass');
-    expect(verifyPassword('LabPass#1234', h)).toBe(true);
-    expect(verifyPassword('wrong', h)).toBe(false);
-    expect(hashPassword('LabPass#1234')).not.toBe(h);
+    expect(h).toMatch(/^scrypt\$4096\$8\$1\$[0-9a-f]{32}\$[0-9a-f]{64}$/); // work factor is stored with the hash
+    expect(await verifyPassword('LabPass#1234', h)).toBe(true);
+    expect(await verifyPassword('wrong', h)).toBe(false);
+    expect(await hashPassword('LabPass#1234')).not.toBe(h);
   });
 });

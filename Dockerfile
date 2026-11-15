@@ -1,5 +1,5 @@
 # MediCore HMS - academic lab image. One image, two services (backend / frontend dev server).
-FROM node:24-slim
+FROM node:26-slim
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY backend/package.json backend/

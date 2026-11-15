@@ -60,25 +60,35 @@ npm run docker:reset     # rebuild the synthetic dataset
 All published ports bind to `127.0.0.1`; the database publishes no port. The images are built, started and smoke-tested against PostgreSQL in CI (secure and lab modes).
 
 ## Test accounts (development only)
-| Username | Password | Role |
-|---|---|---|
-| admin.hartley | LabAdmin#2026 | Administrator |
-| doctor.mehta | LabDoctor#2026 | Doctor |
-| doctor.svensson | LabDoctor#2026 | Doctor |
-| nurse.okafor | LabNurse#2026 | Nurse |
-| receptionist.lindqvist | LabFront#2026 | Receptionist |
-| labtech.alvarez | LabTech#2026 | Laboratory technician |
-| pharmacist.rossi | LabPharm#2026 | Pharmacist |
-| billing.nakamura | LabBill#2026 | Billing officer |
-| assessor.vance | LabAssess#2026 | Security assessor |
-| patient.portal | LabPatient#2026 | Patient (portal account for the patient SYN-000005) |
+| Username | Password | Role | Good for trying |
+|---|---|---|---|
+| admin.hartley | LabAdmin#2026 | Administrator | Reports, rosters, users, API docs at `/api/docs` |
+| doctor.mehta | LabDoctor#2026 | Doctor | Consultations, prescribing checks, vitals charts |
+| doctor.svensson | LabDoctor#2026 | Doctor | A second care team (record isolation) |
+| nurse.okafor | LabNurse#2026 | Nurse | Medication round, bed alerts |
+| receptionist.lindqvist | LabFront#2026 | Receptionist | Emergency triage, `Ctrl+K` search |
+| labtech.alvarez | LabTech#2026 | Laboratory technician | Lab requests and results |
+| pharmacist.rossi | LabPharm#2026 | Pharmacist | Inventory, dispensing and refills |
+| billing.nakamura | LabBill#2026 | Billing officer | Refunds, insurance claims |
+| assessor.vance | LabAssess#2026 | Security assessor | Assessment area |
+| patient.portal | LabPatient#2026 | Patient (portal account for SYN-000005) | The patient portal |
 
-Password-reset codes are delivered to Administration → Local outbox (no email is sent). Five failed logins lock an account for 10 minutes.
+### Locked out, or the password was changed?
+Restore the documented passwords without losing any data (this also clears lockouts, two-step verification and open sessions, and re-activates the account):
+```bash
+npm run db:reset-passwords                      # every demo account above
+npm run db:reset-passwords -- admin.hartley     # only the named account(s)
+npm run docker:reset-passwords                  # same thing for the Docker setup
+```
+It is a local command only: it refuses non-local database hosts and `NODE_ENV=production`, and there is no HTTP endpoint for it. Accounts you created yourself are never touched. If the whole database is a mess, `npm run db:reset -- --yes` rebuilds all the demo data.
+
+Password-reset codes for the in-app "Forgot password?" flow are delivered to Administration → Local outbox (no email is sent), so that route needs a signed-in administrator to read the code. Five failed logins lock an account for 10 minutes.
 
 ## Commands
 | Task | Command |
 |---|---|
 | Migrate / seed | `npm run db:migrate` / `npm run db:seed` |
+| Restore demo passwords (keeps all data) | `npm run db:reset-passwords [-- username]` |
 | Reset clinical data (confirms first; keeps assessment records) | `npm run db:reset` (`-- --yes`, `-- --include-assessment`) |
 | Typecheck / lint / build | `npm run typecheck` · `npm run lint` · `npm run build` |
 | Tests | `npm test` (API and unit tests) · `npm run test:e2e` (Playwright browser tests) |

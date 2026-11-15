@@ -11,6 +11,7 @@
     "migrate": "tsx src/db/cli.ts migrate",
     "seed": "tsx src/db/cli.ts seed",
     "reset": "tsx src/db/cli.ts reset",
+    "reset-passwords": "tsx src/db/cli.ts reset-passwords",
     "report": "tsx src/assessment/reportCli.ts",
     "test": "vitest run"
   },

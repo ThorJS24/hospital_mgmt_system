@@ -14,6 +14,7 @@
     "db:migrate": "npm run migrate -w backend",
     "db:seed": "npm run seed -w backend",
     "db:reset": "npm run reset -w backend --",
+    "db:reset-passwords": "npm run reset-passwords -w backend --",
     "report": "npm run report -w backend",
     "typecheck": "npm run typecheck -w backend && npm run typecheck -w frontend",
     "build": "npm run build -w backend && npm run build -w frontend",
@@ -23,6 +24,7 @@
     "docker:lab": "docker compose -f docker-compose.yml -f docker-compose.lab.yml up --build",
     "docker:secure": "docker compose up --build",
     "docker:reset": "docker compose run --rm backend npm run reset -w backend",
+    "docker:reset-passwords": "docker compose run --rm backend npm run reset-passwords -w backend --",
     "test": "npm run test -w backend && npm run test -w frontend",
     "test:e2e": "playwright test"
   },

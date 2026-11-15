@@ -16,7 +16,7 @@ MediCore is **deliberately vulnerable**. Treat it like any other vulnerable trai
 | SQL scenarios: read-only transaction, single statement, statement timeout | `vulnerable/routes.ts`, `vulnerable/extra.ts` |
 | Upload scenario: size limit, stored outside web root, never executed | `vulnerable/routes.ts` |
 | Path traversal sandboxed to `lab-data/` | `vulnerable/routes.ts` |
-| Reset only via local CLI; refuses non-local DB hosts and production | `backend/src/db/cli.ts` |
+| Reset and demo-password restore only via local CLI; both refuse non-local DB hosts and production, and neither has an HTTP endpoint | `backend/src/db/cli.ts` |
 | Assessment data only for the assessor role; hospital admins cannot manage assessors | `permissions.ts`, `routes/admin.ts` |
 | Fake sensitive data is invalid by construction (SSN 9xx, processor test cards, `.example.test`) | `db/seed.ts` |
 | No outbound HTTP code | SSRF scenario was remediated and removed |
@@ -26,6 +26,9 @@ Run `npm run start:secure` (or `docker compose up` without the lab override). Ev
 
 ## Resetting
 `npm run db:reset` rebuilds the synthetic clinical data and preserves assessment records; add `-- --include-assessment` to wipe those too.
+
+### Locked out of a demo account
+`npm run db:reset-passwords` (all demo accounts) or `npm run db:reset-passwords -- admin.hartley` restores the documented development password and keeps every other record. It also clears lockouts, two-step verification (secret and recovery codes), pending reset codes and open sessions, re-activates the account, and writes a `demo_password_restored` audit event. Only the accounts listed in the README are affected; accounts created through Administration are never touched. For the Docker setup use `npm run docker:reset-passwords`. With the embedded database, stop the backend first (only one process can open it).
 
 ## Features added after the hardening pass
 - New endpoints follow the same controls as the rest of the API: zod validation, parameterised SQL, `requirePermission`, CSRF on every unsafe method, and object-level scoping where records belong to a care team.
